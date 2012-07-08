@@ -320,7 +320,7 @@ struct cgpu_info {
 		int device_fd;
 	};
 #ifdef USE_BITFORCE
-	unsigned int wait_ms;
+	unsigned long wait_us;
 	unsigned int sleep_ms;
 	uint32_t nonces;
 	bool nonce_range;

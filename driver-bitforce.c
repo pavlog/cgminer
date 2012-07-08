@@ -21,8 +21,9 @@
 #include "miner.h"
 
 #define BITFORCE_SLEEP_MS 500
-#define BITFORCE_TIMEOUT_MS 10000
-#define BITFORCE_LONG_TIMEOUT_MS 15000
+#define BITFORCE_TIMEOUT_MS 7000
+#define BITFORCE_TIMEOUT_US (BITFORCE_TIMEOUT_MS * 1000)
+#define BITFORCE_LONG_TIMEOUT_US 15000000
 #define BITFORCE_CHECK_INTERVAL_MS 10
 #define WORK_CHECK_INTERVAL_MS 50
 #define MAX_START_DELAY_US 100000
@@ -335,6 +336,7 @@ static uint64_t bitforce_get_result(struct thr_info *thr, struct work *work)
 {
 	struct cgpu_info *bitforce = thr->cgpu;
 	int fdDev = bitforce->device_fd;
+	struct timeval before, after;
 	unsigned int delay_time_ms;
 	char pdevbuf[0x100];
 	char *pnoncebuf;
@@ -344,7 +346,8 @@ static uint64_t bitforce_get_result(struct thr_info *thr, struct work *work)
 	if (!fdDev)
 		return 0;
 
-	while (bitforce->wait_ms < BITFORCE_LONG_TIMEOUT_MS) {
+	while (bitforce->wait_us < BITFORCE_LONG_TIMEOUT_US) {
+		gettimeofday(&before, NULL);
 		if (unlikely(thr->work_restart))
 			return 1;
 
@@ -358,13 +361,16 @@ static uint64_t bitforce_get_result(struct thr_info *thr, struct work *work)
 
 		/* if BFL is throttling, no point checking so quickly */
 		delay_time_ms = (pdevbuf[0] ? BITFORCE_CHECK_INTERVAL_MS : 2 * WORK_CHECK_INTERVAL_MS);
-		nmsleep(delay_time_ms);
-		bitforce->wait_ms += delay_time_ms;
+		/* Busy wait if we're in the 10ms before we expect to get a result */
+		if (bitforce->wait_us < bitforce->sleep_ms * 1000 + BITFORCE_CHECK_INTERVAL_MS * 1000)
+			nmsleep(delay_time_ms);
+		gettimeofday(&after, NULL);
+		bitforce->wait_us += usec_diff(&after, &before);
 	}
 
-	if (bitforce->wait_ms >= BITFORCE_TIMEOUT_MS) {
+	if (bitforce->wait_us >= BITFORCE_TIMEOUT_US) {
 		applog(LOG_ERR, "BFL%i: took %dms - longer than %dms", bitforce->device_id,
-		       bitforce->wait_ms, BITFORCE_TIMEOUT_MS);
+		       bitforce->wait_us / 1000, BITFORCE_TIMEOUT_MS);
 		bitforce->device_last_not_well = time(NULL);
 		bitforce->device_not_well_reason = REASON_DEV_OVER_HEAT;
 		bitforce->dev_over_heat_count++;
@@ -373,13 +379,13 @@ static uint64_t bitforce_get_result(struct thr_info *thr, struct work *work)
 			return 1;
 	} else if (!strncasecmp(pdevbuf, "N", 1)) {/* Hashing complete (NONCE-FOUND or NO-NONCE) */
 		    /* Simple timing adjustment. Allow a few polls to cope with
-		     * OS timer delays being variably reliable. wait_ms will
+		     * OS timer delays being variably reliable. wait_us will
 		     * always equal sleep_ms when we've waited greater than or
 		     * equal to the result return time.*/
 	        delay_time_ms = bitforce->sleep_ms;
-		if (bitforce->wait_ms > bitforce->sleep_ms + (WORK_CHECK_INTERVAL_MS * 2))
-			bitforce->sleep_ms += (bitforce->wait_ms - bitforce->sleep_ms) / 2;
-		else if (bitforce->wait_ms == bitforce->sleep_ms) {
+		if (bitforce->wait_us / 1000 > bitforce->sleep_ms + (WORK_CHECK_INTERVAL_MS * 2))
+			bitforce->sleep_ms += (bitforce->wait_us / 1000 - bitforce->sleep_ms) / 2;
+		else if (bitforce->wait_us / 1000 == bitforce->sleep_ms) {
 			if (bitforce->sleep_ms > WORK_CHECK_INTERVAL_MS)
 				bitforce->sleep_ms -= WORK_CHECK_INTERVAL_MS;
 			else if (bitforce->sleep_ms > BITFORCE_CHECK_INTERVAL_MS)
@@ -387,10 +393,10 @@ static uint64_t bitforce_get_result(struct thr_info *thr, struct work *work)
 		}
 
 		if (delay_time_ms != bitforce->sleep_ms)
-			  applog(LOG_DEBUG, "BFL%i: Wait time changed to: %d", bitforce->device_id, bitforce->sleep_ms, bitforce->wait_ms);
+			  applog(LOG_DEBUG, "BFL%i: Wait time changed to: %d", bitforce->device_id, bitforce->sleep_ms, bitforce->wait_us / 1000);
 	}
 
-	applog(LOG_DEBUG, "BFL%i: waited %dms until %s", bitforce->device_id, bitforce->wait_ms, pdevbuf);
+	applog(LOG_DEBUG, "BFL%i: waited %dms until %s", bitforce->device_id, bitforce->wait_us / 1000, pdevbuf);
 	if (!strncasecmp(&pdevbuf[2], "-", 1))
 		return bitforce->nonces;   /* No valid nonce found */
 	else if (!strncasecmp(pdevbuf, "I", 1))
@@ -442,6 +448,7 @@ static void biforce_thread_enable(struct thr_info *thr)
 static uint64_t bitforce_scanhash(struct thr_info *thr, struct work *work, uint64_t __maybe_unused max_nonce)
 {
 	struct cgpu_info *bitforce = thr->cgpu;
+	struct timeval before, after;
 	unsigned int sleep_time;
 	uint64_t ret;
 
@@ -451,24 +458,28 @@ static uint64_t bitforce_scanhash(struct thr_info *thr, struct work *work, uint6
 		/* Initially wait 2/3 of the average cycle time so we can request more
 		work before full scan is up */
 		sleep_time = (2 * bitforce->sleep_ms) / 3;
+		gettimeofday(&before, NULL);
 		if (!restart_wait(sleep_time))
 			return 1;
+		gettimeofday(&after, NULL);
 
-		bitforce->wait_ms = sleep_time;
+		bitforce->wait_us = usec_diff(&after, &before);
 		queue_request(thr, false);
 
 		/* Now wait athe final 1/3rd; no bitforce should be finished by now */
 		sleep_time = bitforce->sleep_ms - sleep_time;
+		gettimeofday(&before, NULL);
 		if (!restart_wait(sleep_time))
 			return 1;
-
-		bitforce->wait_ms += sleep_time;
+		gettimeofday(&after, NULL);
+		bitforce->wait_us = usec_diff(&after, &before);
 	} else {
 		sleep_time = bitforce->sleep_ms;
+		gettimeofday(&before, NULL);
 		if (!restart_wait(sleep_time))
 			return 1;
-
-		bitforce->wait_ms = sleep_time;
+		gettimeofday(&after, NULL);
+		bitforce->wait_us = usec_diff(&after, &before);
 	}
 
 	if (ret)
