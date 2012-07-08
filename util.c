@@ -703,3 +703,11 @@ void nmsleep(unsigned int msecs)
 		ret = nanosleep(&twait, &tleft);
 	} while (ret == -1 && errno == EINTR);
 }
+
+unsigned long usec_diff(struct timeval *a, struct timeval *b)
+{
+	struct timeval diff;
+
+	timersub(a, b, &diff);
+	return diff.tv_sec * 1000000 + diff.tv_usec;
+}

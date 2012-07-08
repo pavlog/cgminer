@@ -429,6 +429,7 @@ extern int thr_info_create(struct thr_info *thr, pthread_attr_t *attr, void *(*s
 extern void thr_info_cancel(struct thr_info *thr);
 extern void thr_info_freeze(struct thr_info *thr);
 extern void nmsleep(unsigned int msecs);
+extern unsigned long usec_diff(struct timeval *a, struct timeval *b);
 
 struct string_elist {
 	char *string;
