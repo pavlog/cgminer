@@ -534,7 +534,7 @@ struct CODES {
  { SEVERITY_ERR,   MSG_MISBOOL,	PARAM_NONE,	"Missing parameter: true/false" },
  { SEVERITY_ERR,   MSG_INVBOOL,	PARAM_NONE,	"Invalid parameter should be true or false" },
  { SEVERITY_SUCC,  MSG_FOO,	PARAM_BOOL,	"Failover-Only set to %s" },
- { SEVERITY_FAIL, 0, 0, NULL }
+ { SEVERITY_FAIL, 0, (code_parameters)0, NULL }
 };
 
 static int my_thr_id = 0;
@@ -617,7 +617,7 @@ static char *escape_string(char *str, bool isjson)
 	if (count == 0)
 		return str;
 
-	buf = malloc(strlen(str) + count + 1);
+	buf = (char*)malloc(strlen(str) + count + 1);
 	if (unlikely(!buf))
 		quit(1, "Failed to malloc escape buf");
 
@@ -1048,6 +1048,7 @@ static char *message(int messageid, int paramid, char *param2, bool isjson)
 	int cpu;
 #endif
 	int i;
+	int id = -1;
 
 	if (!isjson)
 		msg_buffer[0] = '\0';
@@ -1166,7 +1167,6 @@ static char *message(int messageid, int paramid, char *param2, bool isjson)
 
 	root = api_add_string(root, _STATUS, "F", false);
 	root = api_add_time(root, "When", &when, false);
-	int id = -1;
 	root = api_add_int(root, "Code", &id, false);
 	sprintf(buf, "%d", messageid);
 	root = api_add_string(root, "Msg", buf, false);
@@ -1282,6 +1282,9 @@ static void gpustatus(int gpu, bool isjson)
 	char *status;
 	float gt, gv;
 	int ga, gf, gp, gc, gm, pt;
+	double mhs;
+	char mhsname[27];
+	int last_share_pool;
 
 	if (gpu >= 0 && gpu < nDevs) {
 		struct cgpu_info *cgpu = &gpus[gpu];
@@ -1316,9 +1319,8 @@ static void gpustatus(int gpu, bool isjson)
 		root = api_add_volts(root, "GPU Voltage", &gv, false);
 		root = api_add_int(root, "GPU Activity", &ga, false);
 		root = api_add_int(root, "Powertune", &pt, false);
-		double mhs = cgpu->total_mhashes / total_secs;
+		mhs = cgpu->total_mhashes / total_secs;
 		root = api_add_mhs(root, "MHS av", &mhs, false);
-		char mhsname[27];
 		sprintf(mhsname, "MHS %ds", opt_log_interval);
 		root = api_add_mhs(root, mhsname, &(cgpu->rolling), false);
 		root = api_add_int(root, "Accepted", &(cgpu->accepted), false);
@@ -1326,7 +1328,7 @@ static void gpustatus(int gpu, bool isjson)
 		root = api_add_int(root, "Hardware Errors", &(cgpu->hw_errors), false);
 		root = api_add_utility(root, "Utility", &(cgpu->utility), false);
 		root = api_add_string(root, "Intensity", intensity, false);
-		int last_share_pool = cgpu->last_share_pool_time > 0 ?
+		last_share_pool = cgpu->last_share_pool_time > 0 ?
 					cgpu->last_share_pool : -1;
 		root = api_add_int(root, "Last Share Pool", &last_share_pool, false);
 		root = api_add_time(root, "Last Share Time", &(cgpu->last_share_pool_time), false);
@@ -2055,7 +2057,7 @@ static bool pooldetails(char *param, char **url, char **user, char **pass)
 {
 	char *ptr, *buf;
 
-	ptr = buf = malloc(strlen(param)+1);
+	ptr = buf = (char*)malloc(strlen(param)+1);
 	if (unlikely(!buf))
 		quit(1, "Failed to malloc pooldetails buf");
 
@@ -2153,6 +2155,8 @@ static void poolpriority(__maybe_unused SOCKETTYPE c, char *param, bool isjson, 
 {
 	char *ptr, *next;
 	int i, pr, prio = 0;
+	bool* pools_changed = (bool*)alloca(total_pools*sizeof(bool));
+	int* new_prio = (int*)alloca(total_pools*sizeof(int));
 
 	// TODO: all cgminer code needs a mutex added everywhere for change
 	//	access to total_pools and also parts of the pools[] array,
@@ -2168,8 +2172,6 @@ static void poolpriority(__maybe_unused SOCKETTYPE c, char *param, bool isjson, 
 		return;
 	}
 
-	bool pools_changed[total_pools];
-	int new_prio[total_pools];
 	for (i = 0; i < total_pools; ++i)
 		pools_changed[i] = false;
 
@@ -2598,9 +2600,9 @@ static void devdetails(__maybe_unused SOCKETTYPE c, __maybe_unused char *param, 
 		root = api_add_string(root, "Name", cgpu->api->name, false);
 		root = api_add_int(root, "ID", &(cgpu->device_id), false);
 		root = api_add_string(root, "Driver", cgpu->api->dname, false);
-		root = api_add_const(root, "Kernel", cgpu->kname ? : BLANK, false);
-		root = api_add_const(root, "Model", cgpu->name ? : BLANK, false);
-		root = api_add_const(root, "Device Path", cgpu->device_path ? : BLANK, false);
+		root = api_add_const(root, "Kernel", cgpu->kname ? cgpu->kname : BLANK, false);
+		root = api_add_const(root, "Model", cgpu->name ? cgpu->name : BLANK, false);
+		root = api_add_const(root, "Device Path", cgpu->device_path ? cgpu->device_path : BLANK, false);
 
 		if (isjson && (i > 0))
 			strcat(io_buffer, COMMA);
@@ -2719,6 +2721,7 @@ static void minerstats(__maybe_unused SOCKETTYPE c, __maybe_unused char *param, 
 
 static void failoveronly(__maybe_unused SOCKETTYPE c, char *param, bool isjson, __maybe_unused char group)
 {
+	bool tf;
 	if (param == NULL || *param == '\0') {
 		strcpy(io_buffer, message(MSG_MISBOOL, 0, NULL, isjson));
 		return;
@@ -2731,7 +2734,7 @@ static void failoveronly(__maybe_unused SOCKETTYPE c, char *param, bool isjson, 
 		return;
 	}
 
-	bool tf = (*param == 't');
+	tf = (*param == 't');
 
 	opt_fail_only = tf;
 
@@ -2900,7 +2903,7 @@ static void setup_groups()
 	bool addstar, did;
 	int i;
 
-	buf = malloc(strlen(api_groups) + 1);
+	buf = (char*)malloc(strlen(api_groups) + 1);
 	if (unlikely(!buf))
 		quit(1, "Failed to malloc ipgroups buf");
 
@@ -3000,7 +3003,7 @@ static void setup_groups()
 			}
 		}
 
-		ptr = apigroups[GROUPOFFSET(group)].commands = malloc(strlen(commands) + 1);
+		ptr = apigroups[GROUPOFFSET(group)].commands = (char*)malloc(strlen(commands) + 1);
 		if (unlikely(!ptr))
 			quit(1, "Failed to malloc group commands buf");
 
@@ -3020,7 +3023,7 @@ static void setup_groups()
 		}
 	}
 
-	ptr = apigroups[GROUPOFFSET(NOPRIVGROUP)].commands = malloc(strlen(commands) + 1);
+	ptr = apigroups[GROUPOFFSET(NOPRIVGROUP)].commands = (char*)malloc(strlen(commands) + 1);
 	if (unlikely(!ptr))
 		quit(1, "Failed to malloc noprivgroup commands buf");
 
@@ -3046,7 +3049,7 @@ static void setup_ipaccess()
 	int ipcount, mask, octet, i;
 	char group;
 
-	buf = malloc(strlen(opt_api_allow) + 1);
+	buf = (char*)malloc(strlen(opt_api_allow) + 1);
 	if (unlikely(!buf))
 		quit(1, "Failed to malloc ipaccess buf");
 
@@ -3059,7 +3062,7 @@ static void setup_ipaccess()
 			ipcount++;
 
 	// possibly more than needed, but never less
-	ipaccess = calloc(ipcount, sizeof(struct IP4ACCESS));
+	ipaccess = (struct IP4ACCESS *)calloc(ipcount, sizeof(struct IP4ACCESS));
 	if (unlikely(!ipaccess))
 		quit(1, "Failed to calloc ipaccess");
 
@@ -3284,8 +3287,8 @@ void api(int api_thr_id)
 			applog(LOG_WARNING, "API running in local read access mode on port %d", port);
 	}
 
-	io_buffer = malloc(MYBUFSIZ+1);
-	msg_buffer = malloc(MYBUFSIZ+1);
+	io_buffer = (char*)malloc(MYBUFSIZ+1);
+	msg_buffer = (char*)malloc(MYBUFSIZ+1);
 
 	while (!bye) {
 		clisiz = sizeof(cli);
