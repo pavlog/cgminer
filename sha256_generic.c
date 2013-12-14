@@ -230,7 +230,7 @@ static void sha256_transform(u32 *state, const u8 *input)
 static void runhash(void *state, const void *input, const void *init)
 {
 	memcpy(state, init, 32);
-	sha256_transform(state, input);
+	sha256_transform((u32*)state, (const u8*)input);
 }
 
 const uint32_t sha256_init_state[8] = {

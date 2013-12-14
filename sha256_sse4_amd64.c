@@ -19,8 +19,9 @@
 #include <xmmintrin.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <emmintrin.h>
 
-extern void CalcSha256_x64_sse4(__m128i *res, __m128i *data, uint32_t init[8]);
+extern "C" void CalcSha256_x64_sse4(__m128i *res, __m128i *data, uint32_t init[8]);
 
 static uint32_t g_sha256_k[] = {
     0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, /*  0 */
@@ -59,14 +60,15 @@ bool scanhash_sse4_64(struct thr_info*thr, const unsigned char *pmidstate,
     __m128i m_4w[64], m_4hash[64], m_4hash1[64];
     __m128i offset;
     int i;
+	// vidual studio compilation 
+	/* For debugging */
+	union
+	{
+		__m128i m;
+		uint32_t i[4];
+	} mi;
 
 	pdata += 64;
-
-    /* For debugging */
-    union {
-        __m128i m;
-        uint32_t i[4];
-    } mi;
 
     /* Message expansion */
     memcpy(m_midstate, pmidstate, sizeof(m_midstate));

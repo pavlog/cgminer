@@ -89,7 +89,7 @@ static void SHA256_Transform(word32 *state, const word32 *data)
 static void runhash(void *state, const void *input, const void *init)
 {
 	memcpy(state, init, 32);
-	SHA256_Transform(state, input);
+	SHA256_Transform((word32*)state, (const word32*)input);
 }
 
 /* suspiciously similar to ScanHash* from bitcoin */

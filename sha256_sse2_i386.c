@@ -20,7 +20,12 @@
 #include <stdint.h>
 #include <stdio.h>
 
+#if defined(_MSC_VER)
+#include <emmintrin.h>
+extern void CalcSha256_x86 (__m128i *res, __m128i *data, const uint32_t init[8]);
+#else
 extern void CalcSha256_x86 (__m128i *res, __m128i *data, const uint32_t init[8])__attribute__((fastcall));
+#endif
 
 static uint32_t g_sha256_k[]__attribute__((aligned(0x100))) = {
     0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, /*  0 */
