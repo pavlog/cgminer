@@ -1,4 +1,5 @@
 /*
+ * Copyright 2013-2014 Pavlo Gryb
  * Copyright 2011-2012 Con Kolivas
  * Copyright 2011-2012 Luke Dashjr
  * Copyright 2010 Jeff Garzik
@@ -37,7 +38,7 @@
 #include <ccan/opt/opt.h>
 #include <jansson.h>
 #include <curl/curl.h>
-#include <libgen.h>
+//#include <libgen.h>
 #include <sha2.h>
 
 #include "compat.h"
@@ -144,6 +145,11 @@ bool opt_delaynet;
 bool opt_disable_pool = true;
 char *opt_icarus_options = NULL;
 char *opt_icarus_timing = NULL;
+uint32_t opt_nonce_bias = 0;
+uint32_t opt_nonce_range = 0xffffffff;
+uint32_t opt_nonce_split = 1;
+bool opt_opencl_all = 0;
+
 
 char *opt_kernel_path;
 char *cgminer_path;
@@ -240,7 +246,9 @@ static int include_count;
 
 bool ping = true;
 
+#if !defined(_MSC_VER)
 struct sigaction termhandler, inthandler;
+#endif
 
 struct thread_q *getq;
 
@@ -274,7 +282,8 @@ static bool should_run(void)
 		return true;
 
 	gettimeofday(&tv, NULL);
-	tm = localtime(&tv.tv_sec);
+	time_t tt = tv.tv_sec;
+	tm = localtime((time_t*)&tt);
 	if (schedstart.enable) {
 		if (!schedstop.enable) {
 			if (time_before(tm, &schedstart.tm))
@@ -306,7 +315,8 @@ void get_datestamp(char *f, struct timeval *tv)
 {
 	struct tm *tm;
 
-	tm = localtime(&tv->tv_sec);
+	time_t tt = tv->tv_sec;
+	tm = localtime(&tt);
 	sprintf(f, "[%d-%02d-%02d %02d:%02d:%02d]",
 		tm->tm_year + 1900,
 		tm->tm_mon + 1,
@@ -320,7 +330,8 @@ void get_timestamp(char *f, struct timeval *tv)
 {
 	struct tm *tm;
 
-	tm = localtime(&tv->tv_sec);
+	time_t tt = tv->tv_sec;
+	tm = localtime(&tt);
 	sprintf(f, "[%02d:%02d:%02d]",
 		tm->tm_hour,
 		tm->tm_min,
@@ -379,7 +390,11 @@ static void sharelog(const char*disposition, const struct work*work)
 	}
 
 	// timestamp,disposition,target,pool,dev,thr,sharehash,sharedata
-	rv = snprintf(s, sizeof(s), "%lu,%s,%s,%s,%s%u,%u,%s,%s\n", t, disposition, target, pool->rpc_url, cgpu->api->name, cgpu->device_id, thr_id, hash, data);
+	struct timeval tv__;
+	tv__.tv_sec = t;
+	get_datestamp(blocktime, &tv__);
+	rv = snprintf(s, sizeof(s), "%s,%lu,%lu,%s,%s,%s,%s%u,%u,%s,%s\n", blocktime, work->blk.nonce, t, disposition, target, pool->rpc_url, cgpu->api->name, cgpu->device_id, thr_id, hash, data);
+	//
 	free(target);
 	free(hash);
 	free(data);
@@ -403,11 +418,11 @@ static struct pool *add_pool(void)
 {
 	struct pool *pool;
 
-	pool = calloc(sizeof(struct pool), 1);
+	pool = (struct pool *)calloc(sizeof(struct pool), 1);
 	if (!pool)
 		quit(1, "Failed to malloc pool in add_pool");
 	pool->pool_no = pool->prio = total_pools;
-	pools = realloc(pools, sizeof(struct pool *) * (total_pools + 2));
+	pools = (struct pool **)realloc(pools, sizeof(struct pool *) * (total_pools + 2));
 	pools[total_pools++] = pool;
 	if (unlikely(pthread_mutex_init(&pool->pool_lock, NULL)))
 		quit(1, "Failed to pthread_mutex_init in add_pool");
@@ -545,7 +560,7 @@ static char *set_url(char *arg)
 	    strncmp(arg, "https://", 8)) {
 		char *httpinput;
 
-		httpinput = malloc(255);
+		httpinput = (char*)malloc(255);
 		if (!httpinput)
 			quit(1, "Failed to malloc httpinput");
 		strcpy(httpinput, "http://");
@@ -805,14 +820,15 @@ static struct opt_table opt_config_table[] = {
 	OPT_WITH_ARG("--device|-d",
 		     set_devices, NULL, NULL,
 	             "Select device to use, (Use repeat -d for multiple devices, default: all)"),
+#ifdef HAVE_OPENCL
 	OPT_WITHOUT_ARG("--disable-gpu|-G",
 			opt_set_bool, &opt_nogpu,
-#ifdef HAVE_OPENCL
-			"Disable GPU mining even if suitable devices exist"
+				"Disable GPU mining even if suitable devices exist"),
 #else
-			opt_hidden
+	 OPT_WITHOUT_ARG("--disable-gpu|-G",
+			 opt_set_bool, &opt_nogpu,
+				 opt_hidden),
 #endif
-	),
 #if defined(WANT_CPUMINE) && (defined(HAVE_OPENCL) || defined(USE_FPGA))
 	OPT_WITHOUT_ARG("--enable-cpu|-C",
 			opt_set_bool, &opt_usecpu,
@@ -901,25 +917,27 @@ static struct opt_table opt_config_table[] = {
 	OPT_WITHOUT_ARG("--net-delay",
 			opt_set_bool, &opt_delaynet,
 			"Impose small delays in networking to not overload slow routers"),
+#ifdef HAVE_ADL
 	OPT_WITHOUT_ARG("--no-adl",
 			opt_set_bool, &opt_noadl,
-#ifdef HAVE_ADL
-			"Disable the ATI display library used for monitoring and setting GPU parameters"
+			"Disable the ATI display library used for monitoring and setting GPU parameters"),
 #else
-			opt_hidden
+			OPT_WITHOUT_ARG("--no-adl",
+			opt_set_bool, &opt_noadl,
+			opt_hidden),
 #endif
-	),
 	OPT_WITHOUT_ARG("--no-pool-disable",
 			opt_set_invbool, &opt_disable_pool,
 			"Do not automatically disable pools that continually reject shares"),
+#ifdef HAVE_OPENCL
 	OPT_WITHOUT_ARG("--no-restart",
 			opt_set_invbool, &opt_restart,
-#ifdef HAVE_OPENCL
-			"Do not attempt to restart GPUs that hang"
+			"Do not attempt to restart GPUs that hang"),
 #else
-			opt_hidden
+	OPT_WITHOUT_ARG("--no-restart",
+			opt_set_invbool, &opt_restart,
+			opt_hidden),
 #endif
-	),
 	OPT_WITHOUT_ARG("--no-submit-stale",
 			opt_set_invbool, &opt_submit_stale,
 		        "Don't submit shares if they are detected as stale"),
@@ -1008,14 +1026,15 @@ static struct opt_table opt_config_table[] = {
 		     set_temp_target, opt_show_intval, &opt_targettemp,
 		     "Target temperature when automatically managing fan and GPU speeds, one value or comma separated list"),
 #endif
+#ifdef HAVE_CURSES
 	OPT_WITHOUT_ARG("--text-only|-T",
 			opt_set_invbool, &use_curses,
-#ifdef HAVE_CURSES
-			"Disable ncurses formatted screen output"
+			"Disable ncurses formatted screen output"),
 #else
-			opt_hidden
+	 OPT_WITHOUT_ARG("--text-only|-T",
+			 opt_set_invbool, &use_curses,
+			opt_hidden),
 #endif
-	),
 #ifdef USE_SCRYPT
 	OPT_WITH_ARG("--thread-concurrency",
 		     set_thread_concurrency, NULL, NULL,
@@ -1045,6 +1064,18 @@ static struct opt_table opt_config_table[] = {
 		     "Username:Password pair for bitcoin JSON-RPC server"),
 	OPT_WITH_ARG("--pools",
 			opt_set_bool, NULL, NULL, opt_hidden),
+	OPT_WITH_ARG("--nonce-bias",
+			opt_set_uintval, NULL, &opt_nonce_bias,
+			"Nonce bioas (default: 0)"),
+	OPT_WITH_ARG("--nonce-range",
+			opt_set_uintval, NULL, &opt_nonce_range,
+			"Nonce range (default: 4294967295)"),
+	OPT_WITH_ARG("--nonce-split",
+			opt_set_uintval, NULL, &opt_nonce_split,
+			"Nonce split across threads (default: 1)"),
+	OPT_WITH_ARG("--opencl-all",
+			opt_set_bool, NULL, &opt_opencl_all,
+			"Enumerates all opencl devices (including cpu) (default: 0)"),
 	OPT_ENDTABLE
 };
 
@@ -1141,7 +1172,7 @@ static char *load_config(const char *arg, void __maybe_unused *unused)
 	config = json_load_file(arg, &err);
 #endif
 	if (!json_is_object(config)) {
-		json_error = malloc(JSON_LOAD_ERROR_LEN + strlen(arg) + strlen(err.text));
+		json_error = (char*)malloc(JSON_LOAD_ERROR_LEN + strlen(arg) + strlen(err.text));
 		if (!json_error)
 			quit(1, "Malloc failure in json error");
 
@@ -1158,7 +1189,7 @@ static char *load_config(const char *arg, void __maybe_unused *unused)
 
 static void load_default_config(void)
 {
-	cnfbuf = malloc(PATH_MAX);
+	cnfbuf = (char*)malloc(PATH_MAX);
 
 #if defined(unix)
 	if (getenv("HOME") && *getenv("HOME")) {
@@ -1249,7 +1280,7 @@ static bool jobj_binary(const json_t *obj, const char *key,
 		applog(LOG_ERR, "JSON key '%s' is not a string", key);
 		return false;
 	}
-	if (!hex2bin(buf, hexstr, buflen))
+	if (!hex2bin((unsigned char*)buf, hexstr, buflen))
 		return false;
 
 	return true;
@@ -1262,10 +1293,10 @@ static void calc_midstate(struct work *work)
 		uint32_t i[16];
 	} data;
 	int swapcounter;
+	sha2_context ctx;
 
 	for (swapcounter = 0; swapcounter < 16; swapcounter++)
 		data.i[swapcounter] = swab32(((uint32_t*) (work->data))[swapcounter]);
-	sha2_context ctx;
 	sha2_starts( &ctx, 0 );
 	sha2_update( &ctx, data.c, 64 );
 	memcpy(work->midstate, ctx.state, sizeof(work->midstate));
@@ -2026,7 +2057,7 @@ out:
 
 static struct work *make_work(void)
 {
-	struct work *work = calloc(1, sizeof(struct work));
+	struct work *work = (struct work *)calloc(1, sizeof(struct work));
 
 	if (unlikely(!work))
 		quit(1, "Failed to calloc work in make_work");
@@ -2172,9 +2203,11 @@ void app_restart(void)
 
 static void sighandler(int __maybe_unused sig)
 {
+#if !defined(_MSC_VER)
 	/* Restore signal handlers so we can still quit if kill_work fails */
 	sigaction(SIGTERM, &termhandler, NULL);
 	sigaction(SIGINT, &inthandler, NULL);
+#endif
 	kill_work();
 }
 
@@ -2182,7 +2215,7 @@ static void sighandler(int __maybe_unused sig)
  * this pool. */
 static void recruit_curl(struct pool *pool)
 {
-	struct curl_ent *ce = calloc(sizeof(struct curl_ent), 1);
+	struct curl_ent *ce = (struct curl_ent *)calloc(sizeof(struct curl_ent), 1);
 
 	ce->curl = curl_easy_init();
 	if (unlikely(!ce->curl || !ce))
@@ -2214,7 +2247,7 @@ retry:
 		} else
 			recruit_curl(pool);
 	}
-	ce = list_entry(pool->curlring.next, struct curl_ent, node);
+	ce = list_entry(pool->curlring.next, struct curl_ent*, node);
 	list_del(&ce->node);
 	mutex_unlock(&pool->pool_lock);
 
@@ -2862,7 +2895,7 @@ static void test_work_current(struct work *work)
 	/* Search to see if this block exists yet and if not, consider it a
 	 * new block and set the current block details to this one */
 	if (!block_exists(hexstr)) {
-		struct block *s = calloc(sizeof(struct block), 1);
+		struct block *s = (struct block *)calloc(sizeof(struct block), 1);
 
 		if (unlikely(!s))
 			quit (1, "test_work_current OOM");
@@ -2937,7 +2970,7 @@ static bool hash_push(struct work *work)
 
 static void *stage_thread(void *userdata)
 {
-	struct thr_info *mythr = userdata;
+	struct thr_info *mythr = (struct thr_info *)userdata;
 	bool ok = true;
 
 	pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
@@ -2947,7 +2980,7 @@ static void *stage_thread(void *userdata)
 
 		applog(LOG_DEBUG, "Popping work to stage thread");
 
-		work = tq_pop(mythr->q, NULL);
+		work = (struct work *)tq_pop(mythr->q, NULL);
 		if (unlikely(!work)) {
 			applog(LOG_ERR, "Failed to tq_pop in stage_thread");
 			ok = false;
@@ -3077,9 +3110,9 @@ static char *json_escape(char *str)
 	char *buf, *ptr;
 
 	/* 2x is the max, may as well just allocate that */
-	ptr = buf = malloc(strlen(str) * 2 + 1);
+	ptr = buf = (char*)malloc(strlen(str) * 2 + 1);
 
-	jeptr = malloc(sizeof(*jeptr));
+	jeptr = (struct JE *)malloc(sizeof(*jeptr));
 
 	jeptr->buf = buf;
 	jeptr->next = jedata;
@@ -3100,6 +3133,7 @@ static char *json_escape(char *str)
 void write_config(FILE *fcfg)
 {
 	int i;
+	struct opt_table *opt;
 
 	/* Write pool values */
 	fputs("{\n\"pools\" : [", fcfg);
@@ -3202,7 +3236,6 @@ void write_config(FILE *fcfg)
 #endif
 
 	/* Simple bool and int options */
-	struct opt_table *opt;
 	for (opt = opt_config_table; opt->type != OPT_END; opt++) {
 		char *p, *name = strdup(opt->names);
 		for (p = strtok(name, "|"); p; p = strtok(NULL, "|")) {
@@ -3640,7 +3673,7 @@ static void *input_thread(void __maybe_unused *userdata)
 /* This thread should not be shut down unless a problem occurs */
 static void *workio_thread(void *userdata)
 {
-	struct thr_info *mythr = userdata;
+	struct thr_info *mythr = (struct thr_info *)userdata;
 	bool ok = true;
 
 	pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
@@ -3651,7 +3684,7 @@ static void *workio_thread(void *userdata)
 		applog(LOG_DEBUG, "Popping work to work thread");
 
 		/* wait for workio_cmd sent to us, on our queue */
-		wc = tq_pop(mythr->q, NULL);
+		wc = (struct workio_cmd *)tq_pop(mythr->q, NULL);
 		if (unlikely(!wc)) {
 			applog(LOG_ERR, "Failed to tq_pop in workio_thread");
 			ok = false;
@@ -3679,7 +3712,7 @@ static void *workio_thread(void *userdata)
 
 static void *api_thread(void *userdata)
 {
-	struct thr_info *mythr = userdata;
+	struct thr_info *mythr = (struct thr_info *)userdata;
 
 	pthread_detach(pthread_self());
 	pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
@@ -3880,7 +3913,7 @@ static bool pool_active(struct pool *pool, bool pinging)
 				if (pool->rpc_url[strlen(pool->rpc_url) - 1] != '/')
 					need_slash = true;
 
-				pool->lp_url = malloc(strlen(pool->rpc_url) + strlen(copy_start) + 2);
+				pool->lp_url = (char*)malloc(strlen(pool->rpc_url) + strlen(copy_start) + 2);
 				if (!pool->lp_url) {
 					applog(LOG_ERR, "Malloc failure in pool_active");
 					return false;
@@ -3938,7 +3971,7 @@ static bool queue_request(struct thr_info *thr, bool needed)
 	struct workio_cmd *wc;
 
 	/* fill out work request message */
-	wc = calloc(1, sizeof(*wc));
+	wc = (struct workio_cmd *)calloc(1, sizeof(*wc));
 	if (unlikely(!wc)) {
 		applog(LOG_ERR, "Failed to calloc wc in queue_request");
 		return false;
@@ -4154,7 +4187,7 @@ bool submit_work_sync(struct thr_info *thr, const struct work *work_in)
 	struct workio_cmd *wc;
 
 	/* fill out work request message */
-	wc = calloc(1, sizeof(*wc));
+	wc = (struct workio_cmd *)calloc(1, sizeof(*wc));
 	if (unlikely(!wc)) {
 		applog(LOG_ERR, "Failed to calloc wc in submit_work_sync");
 		return false;
@@ -4259,7 +4292,7 @@ static void mt_disable(struct thr_info *mythr, const int thr_id,
 
 void *miner_thread(void *userdata)
 {
-	struct thr_info *mythr = userdata;
+	struct thr_info *mythr = (struct thr_info *)userdata;
 	const int thr_id = mythr->id;
 	struct cgpu_info *cgpu = mythr->cgpu;
 	struct device_api *api = cgpu->api;
@@ -4268,10 +4301,21 @@ void *miner_thread(void *userdata)
 	struct timeval getwork_start;
 
 	/* Try to cycle approximately 5 times before each log update */
-	const long cycle = opt_log_interval / 5 ? : 1;
+	const long cycle = opt_log_interval / 5 ? 5 : 1;
 	struct timeval tv_start, tv_end, tv_workstart, tv_lastupdate;
 	struct timeval diff, sdiff, wdiff = {0, 0};
 	uint32_t max_nonce = api->can_limit_work ? api->can_limit_work(mythr) : 0xffffffff;
+	if( max_nonce==0xffffffff )
+	{
+		if( opt_nonce_split )
+		{
+			max_nonce = opt_nonce_range / (opt_n_threads!=-1 ? opt_n_threads : mythr->cgpu->threads) * (thr_id + 1)+opt_nonce_bias;
+		}
+		else
+		{
+			max_nonce = opt_nonce_bias+opt_nonce_range;
+		}
+	}
 	int64_t hashes_done = 0;
 	int64_t hashes;
 	struct work *work = make_work();
@@ -4308,7 +4352,17 @@ void *miner_thread(void *userdata)
 		}
 		requested = false;
 		gettimeofday(&tv_workstart, NULL);
+
 		work->blk.nonce = 0;
+		if( opt_nonce_split )
+		{
+			work->blk.nonce = opt_nonce_range / (opt_n_threads!=-1 ? opt_n_threads : mythr->cgpu->threads) * thr_id+opt_nonce_bias;
+		}
+		else
+		{
+			work->blk.nonce = opt_nonce_bias;
+		}
+
 		cgpu->max_hashes = 0;
 		if (api->prepare_work && !api->prepare_work(mythr, work)) {
 			applog(LOG_ERR, "work prepare failed, exiting "
@@ -4350,6 +4404,7 @@ void *miner_thread(void *userdata)
 			pool_stats->getwork_calls++;
 
 			thread_reportin(mythr);
+			applog(LOG_DEBUG, "[thread %d: %lu %lu %lu]", thr_id, work->blk.nonce,max_nonce,max_nonce-work->blk.nonce);
 			hashes = api->scanhash(mythr, work, work->blk.nonce + max_nonce);
 			thread_reportin(mythr);
 
@@ -5022,7 +5077,7 @@ void add_pool_details(bool live, char *url, char *user, char *pass)
 	pool->rpc_url = url;
 	pool->rpc_user = user;
 	pool->rpc_pass = pass;
-	pool->rpc_userpass = malloc(strlen(pool->rpc_user) + strlen(pool->rpc_pass) + 2);
+	pool->rpc_userpass = (char*)malloc(strlen(pool->rpc_user) + strlen(pool->rpc_pass) + 2);
 	if (!pool->rpc_userpass)
 		quit(1, "Failed to malloc userpass");
 	sprintf(pool->rpc_userpass, "%s:%s", pool->rpc_user, pool->rpc_pass);
@@ -5182,9 +5237,9 @@ void enable_curses(void) {
 
 /* TODO: fix need a dummy CPU device_api even if no support for CPU mining */
 #ifndef WANT_CPUMINE
-struct device_api cpu_api;
+//struct device_api cpu_api;
 struct device_api cpu_api = {
-	.name = "CPU",
+	/*.name = */"CPU",
 };
 #endif
 
@@ -5216,7 +5271,7 @@ void enable_device(struct cgpu_info *cgpu)
 	adj_width(mining_threads, &dev_width);
 #endif
 #ifdef HAVE_OPENCL
-	if (cgpu->api == &opencl_api) {
+	if (cgpu->api == &opencl_api()) {
 		gpu_threads += cgpu->threads;
 	}
 #endif
@@ -5237,12 +5292,12 @@ bool add_cgpu(struct cgpu_info*cgpu)
 	if (d)
 		cgpu->device_id = ++d->lastid;
 	else {
-		d = malloc(sizeof(*d));
+		d = (struct _cgpu_devid_counter *)malloc(sizeof(*d));
 		memcpy(d->name, cgpu->api->name, sizeof(d->name));
 		cgpu->device_id = d->lastid = 0;
 		HASH_ADD_STR(devids, name, d);
 	}
-	devices = realloc(devices, sizeof(struct cgpu_info *) * (total_devices + 2));
+	devices = (struct cgpu_info **)realloc(devices, sizeof(struct cgpu_info *) * (total_devices + 2));
 	devices[total_devices++] = cgpu;
 	return true;
 }
@@ -5252,7 +5307,9 @@ int main(int argc, char *argv[])
 	struct block *block, *tmpblock;
 	struct work *work, *tmpwork;
 	bool pools_active = false;
+#if !defined(_MSC_VER)
 	struct sigaction handler;
+#endif
 	struct thr_info *thr;
 	char *s;
 	unsigned int k;
@@ -5263,7 +5320,7 @@ int main(int argc, char *argv[])
 	if (unlikely(curl_global_init(CURL_GLOBAL_ALL)))
 		quit(1, "Failed to curl_global_init");
 
-	initial_args = malloc(sizeof(char *) * (argc + 1));
+	initial_args = (const char **)malloc(sizeof(char *) * (argc + 1));
 	for  (i = 0; i < argc; i++)
 		initial_args[i] = strdup(argv[i]);
 	initial_args[argc] = NULL;
@@ -5294,19 +5351,26 @@ int main(int argc, char *argv[])
 	init_max_name_len();
 #endif
 
+	opt_kernel_path = (char*)alloca(PATH_MAX);
+	strcpy(opt_kernel_path, CGMINER_PREFIX);
+
+#if !defined(_MSC_VER)
 	handler.sa_handler = &sighandler;
 	handler.sa_flags = 0;
 	sigemptyset(&handler.sa_mask);
 	sigaction(SIGTERM, &handler, &termhandler);
 	sigaction(SIGINT, &handler, &inthandler);
 
-	opt_kernel_path = alloca(PATH_MAX);
-	strcpy(opt_kernel_path, CGMINER_PREFIX);
-	cgminer_path = alloca(PATH_MAX);
+	cgminer_path = (char*)alloca(PATH_MAX);
 	s = strdup(argv[0]);
 	strcpy(cgminer_path, dirname(s));
 	free(s);
 	strcat(cgminer_path, "/");
+#else
+	cgminer_path = (char*)alloca(PATH_MAX);
+	GetCurrentDirectory(PATH_MAX-1,cgminer_path);
+#endif
+
 #ifdef WANT_CPUMINE
 	// Hack to make cgminer silent when called recursively on WIN32
 	int skip_to_bench = 0;
@@ -5321,7 +5385,7 @@ int main(int argc, char *argv[])
 	logstart = devcursor + 1;
 	logcursor = logstart + 1;
 
-	block = calloc(sizeof(struct block), 1);
+	block = (struct block*)calloc(sizeof(struct block), 1);
 	if (unlikely(!block))
 		quit (1, "main OOM");
 	for (i = 0; i < 36; i++)
@@ -5354,7 +5418,7 @@ int main(int argc, char *argv[])
 		struct pool *pool;
 
 		pool = add_pool();
-		pool->rpc_url = malloc(255);
+		pool->rpc_url = (char*)malloc(255);
 		strcpy(pool->rpc_url, "Benchmark");
 		pool->rpc_user = pool->rpc_url;
 		pool->rpc_pass = pool->rpc_url;
@@ -5443,7 +5507,7 @@ int main(int argc, char *argv[])
 
 #ifdef HAVE_OPENCL
 	if (!opt_nogpu)
-		opencl_api.api_detect();
+		opencl_api().api_detect();
 	gpu_threads = 0;
 #endif
 
@@ -5538,12 +5602,12 @@ int main(int argc, char *argv[])
 		if (!pool->rpc_userpass) {
 			if (!pool->rpc_user || !pool->rpc_pass)
 				quit(1, "No login credentials supplied for pool %u %s", i, pool->rpc_url);
-			pool->rpc_userpass = malloc(strlen(pool->rpc_user) + strlen(pool->rpc_pass) + 2);
+			pool->rpc_userpass = (char*)malloc(strlen(pool->rpc_user) + strlen(pool->rpc_pass) + 2);
 			if (!pool->rpc_userpass)
 				quit(1, "Failed to malloc userpass");
 			sprintf(pool->rpc_userpass, "%s:%s", pool->rpc_user, pool->rpc_pass);
 		} else {
-			pool->rpc_user = malloc(strlen(pool->rpc_userpass) + 1);
+			pool->rpc_user = (char*)malloc(strlen(pool->rpc_userpass) + 1);
 			if (!pool->rpc_user)
 				quit(1, "Failed to malloc user");
 			strcpy(pool->rpc_user, pool->rpc_userpass);
@@ -5566,7 +5630,7 @@ int main(int argc, char *argv[])
 	#endif // defined(unix)
 
 	total_threads = mining_threads + 7;
-	thr_info = calloc(total_threads, sizeof(*thr));
+	thr_info = (struct thr_info *)calloc(total_threads, sizeof(*thr));
 	if (!thr_info)
 		quit(1, "Failed to calloc thr_info");
 
@@ -5667,7 +5731,7 @@ begin_bench:
 	k = 0;
 	for (i = 0; i < total_devices; ++i) {
 		struct cgpu_info *cgpu = devices[i];
-		cgpu->thr = malloc(sizeof(*cgpu->thr) * (cgpu->threads+1));
+		cgpu->thr = (struct thr_info **)malloc(sizeof(*cgpu->thr) * (cgpu->threads+1));
 		cgpu->thr[cgpu->threads] = NULL;
 		cgpu->status = LIFE_INIT;
 
