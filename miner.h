@@ -147,7 +147,12 @@ void *alloca (size_t);
 #define unlikely(expr) (expr)
 #define likely(expr) (expr)
 #endif
+
+#if !defined(_MSC_VER)
 #define __maybe_unused		__attribute__((unused))
+#else
+#define __maybe_unused
+#endif
 
 #define uninitialised_var(x) x = x
 
@@ -455,7 +460,7 @@ static inline void string_elist_add(const char *s, struct list_head *head)
 {
 	struct string_elist *n;
 
-	n = calloc(1, sizeof(*n));
+	n = (struct string_elist *)calloc(1, sizeof(*n));
 	n->string = strdup(s);
 	n->free_me = true;
 	list_add_tail(&n->list, head);
@@ -476,8 +481,8 @@ static inline uint32_t swab32(uint32_t v)
 
 static inline void swap256(void *dest_p, const void *src_p)
 {
-	uint32_t *dest = dest_p;
-	const uint32_t *src = src_p;
+	uint32_t *dest = (uint32_t *)dest_p;
+	const uint32_t *src = (const uint32_t *)src_p;
 
 	dest[0] = src[7];
 	dest[1] = src[6];
@@ -571,6 +576,10 @@ extern char *opt_icarus_timing;
 #ifdef USE_BITFORCE
 extern bool opt_bfl_noncerange;
 #endif
+extern uint32_t opt_nonce_bias;
+extern uint32_t opt_nonce_range;
+extern uint32_t opt_nonce_split;
+extern bool opt_opencl_all;
 
 extern pthread_rwlock_t netacc_lock;
 
