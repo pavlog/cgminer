@@ -32,7 +32,7 @@ static void my_log_curses(__maybe_unused int prio, char *f, va_list ap)
 	{
 		int len = strlen(f);
 
-		strcpy(f + len - 1, "                    \n");
+		//strcpy(f + len - 1, "                    \n");
 
 		mutex_lock(&console_lock);
 		vprintf(f, ap);
@@ -83,10 +83,11 @@ static void log_generic(int prio, const char *fmt, va_list ap)
 
 		gettimeofday(&tv, NULL);
 
-		tm = localtime(&tv.tv_sec);
+		time_t tt = tv.tv_sec;
+		tm = localtime(&tt);
 
 		len = 40 + strlen(fmt) + 22;
-		f = alloca(len);
+		f = (char*)alloca(len+20);
 		sprintf(f, " [%d-%02d-%02d %02d:%02d:%02d] %s\n",
 			tm->tm_year + 1900,
 			tm->tm_mon + 1,
