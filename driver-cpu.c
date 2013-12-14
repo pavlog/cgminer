@@ -27,7 +27,7 @@
 #include <sys/wait.h>
 #include <sys/resource.h>
 #endif
-#include <libgen.h>
+//#include <libgen.h>
 
 #include "compat.h"
 #include "miner.h"
