@@ -595,12 +595,12 @@ char *set_intensity(char *arg)
 
 
 #ifdef HAVE_OPENCL
-struct device_api opencl_api;
+struct device_api& opencl_api();
 
 char *print_ndevs_and_exit(int *ndevs)
 {
 	opt_log_output = true;
-	opencl_api.api_detect();
+	opencl_api().api_detect();
 	clear_adl(*ndevs);
 	applog(LOG_INFO, "%i GPU devices max detected", *ndevs);
 	exit(*ndevs);
@@ -608,8 +608,8 @@ char *print_ndevs_and_exit(int *ndevs)
 #endif
 
 
-struct cgpu_info gpus[MAX_GPUDEVICES]; /* Maximum number apparently possible */
-struct cgpu_info *cpus;
+//struct cgpu_info gpus[MAX_GPUDEVICES]; /* Maximum number apparently possible */
+//struct cgpu_info *cpus;
 
 
 
@@ -638,7 +638,7 @@ void pause_dynamic_threads(int gpu)
 }
 
 
-struct device_api opencl_api;
+//struct device_api opencl_api;
 
 #endif /* HAVE_OPENCL */
 
@@ -896,7 +896,7 @@ static cl_int queue_poclbm_kernel(_clState *clState, dev_blk_ctx *blk, cl_uint t
 
 	if (!clState->goffset) {
 		cl_uint vwidth = clState->vwidth;
-		uint *nonces = alloca(sizeof(uint) * vwidth);
+		uint *nonces = (uint*)alloca(sizeof(uint) * vwidth);
 		unsigned int i;
 
 		for (i = 0; i < vwidth; i++)
@@ -949,7 +949,7 @@ static cl_int queue_phatk_kernel(_clState *clState, dev_blk_ctx *blk,
 	CL_SET_BLKARG(cty_g);
 	CL_SET_BLKARG(cty_h);
 
-	nonces = alloca(sizeof(uint) * vwidth);
+	nonces = (uint*)alloca(sizeof(uint) * vwidth);
 	for (i = 0; i < vwidth; i++)
 		nonces[i] = blk->nonce + i;
 	CL_SET_VARG(vwidth, nonces);
@@ -977,7 +977,7 @@ static cl_int queue_diakgcn_kernel(_clState *clState, dev_blk_ctx *blk,
 
 	if (!clState->goffset) {
 		cl_uint vwidth = clState->vwidth;
-		uint *nonces = alloca(sizeof(uint) * vwidth);
+		uint *nonces = (uint*)alloca(sizeof(uint) * vwidth);
 		unsigned int i;
 		for (i = 0; i < vwidth; i++)
 			nonces[i] = blk->nonce + i;
@@ -1037,7 +1037,7 @@ static cl_int queue_diablo_kernel(_clState *clState, dev_blk_ctx *blk, cl_uint t
 
 	if (!clState->goffset) {
 		cl_uint vwidth = clState->vwidth;
-		uint *nonces = alloca(sizeof(uint) * vwidth);
+		uint *nonces = (uint*)alloca(sizeof(uint) * vwidth);
 		unsigned int i;
 
 		for (i = 0; i < vwidth; i++)
@@ -1132,7 +1132,7 @@ static void set_threads_hashes(unsigned int vectors, unsigned int *threads,
  * GPU */
 void *reinit_gpu(void *userdata)
 {
-	struct thr_info *mythr = userdata;
+	struct thr_info *mythr = (struct thr_info *)userdata;
 	struct cgpu_info *cgpu;
 	struct thr_info *thr;
 	struct timeval now;
@@ -1143,7 +1143,7 @@ void *reinit_gpu(void *userdata)
 	pthread_detach(pthread_self());
 
 select_cgpu:
-	cgpu = tq_pop(mythr->q, NULL);
+	cgpu = (struct cgpu_info *)tq_pop(mythr->q, NULL);
 	if (!cgpu)
 		goto out;
 
@@ -1157,7 +1157,7 @@ select_cgpu:
 	for (thr_id = 0; thr_id < mining_threads; ++thr_id) {
 		thr = &thr_info[thr_id];
 		cgpu = thr->cgpu;
-		if (cgpu->api != &opencl_api)
+		if (cgpu->api != &opencl_api())
 			continue;
 		if (dev_from_id(thr_id) != gpu)
 			continue;
@@ -1182,7 +1182,7 @@ select_cgpu:
 
 		thr = &thr_info[thr_id];
 		cgpu = thr->cgpu;
-		if (cgpu->api != &opencl_api)
+		if (cgpu->api != &opencl_api())
 			continue;
 		if (dev_from_id(thr_id) != gpu)
 			continue;
@@ -1219,7 +1219,7 @@ select_cgpu:
 	for (thr_id = 0; thr_id < mining_threads; ++thr_id) {
 		thr = &thr_info[thr_id];
 		cgpu = thr->cgpu;
-		if (cgpu->api != &opencl_api)
+		if (cgpu->api != &opencl_api())
 			continue;
 		if (dev_from_id(thr_id) != gpu)
 			continue;
@@ -1240,7 +1240,7 @@ void *reinit_gpu(__maybe_unused void *userdata)
 
 
 #ifdef HAVE_OPENCL
-struct device_api opencl_api;
+//struct device_api opencl_api;
 
 static void opencl_detect()
 {
@@ -1260,7 +1260,7 @@ static void opencl_detect()
 
 		cgpu = &gpus[i];
 		cgpu->deven = DEV_ENABLED;
-		cgpu->api = &opencl_api;
+		cgpu->api = &opencl_api();
 		cgpu->device_id = i;
 		cgpu->threads = opt_g_threads;
 		cgpu->virtual_gpu = i;
@@ -1325,7 +1325,7 @@ static bool opencl_thread_prepare(struct thr_info *thr)
 	static bool failmessage = false;
 
 	if (!blank_res)
-		blank_res = calloc(BUFFERSIZE, 1);
+		blank_res = (uint32_t*)calloc(BUFFERSIZE, 1);
 	if (!blank_res) {
 		applog(LOG_ERR, "Failed to calloc in opencl_thread_init");
 		return false;
@@ -1404,7 +1404,7 @@ static bool opencl_thread_init(struct thr_info *thr)
 	struct opencl_thread_data *thrdata;
 	_clState *clState = clStates[thr_id];
 	cl_int status = 0;
-	thrdata = calloc(1, sizeof(*thrdata));
+	thrdata = (struct opencl_thread_data *)calloc(1, sizeof(*thrdata));
 	thr->cgpu_data = thrdata;
 
 	if (!thrdata) {
@@ -1433,7 +1433,7 @@ static bool opencl_thread_init(struct thr_info *thr)
 			break;
 	}
 
-	thrdata->res = calloc(BUFFERSIZE, 1);
+	thrdata->res = (uint32_t*)calloc(BUFFERSIZE, 1);
 
 	if (!thrdata->res) {
 		free(thrdata);
@@ -1458,7 +1458,7 @@ static bool opencl_thread_init(struct thr_info *thr)
 static void opencl_free_work(struct thr_info *thr, struct work *work)
 {
 	const int thr_id = thr->id;
-	struct opencl_thread_data *thrdata = thr->cgpu_data;
+	struct opencl_thread_data *thrdata = (struct opencl_thread_data *)thr->cgpu_data;
 	_clState *clState = clStates[thr_id];
 
 	clFinish(clState->commandQueue);
@@ -1485,7 +1485,7 @@ static int64_t opencl_scanhash(struct thr_info *thr, struct work *work,
 				int64_t __maybe_unused max_nonce)
 {
 	const int thr_id = thr->id;
-	struct opencl_thread_data *thrdata = thr->cgpu_data;
+	struct opencl_thread_data *thrdata = (struct opencl_thread_data *)thr->cgpu_data;
 	struct cgpu_info *gpu = thr->cgpu;
 	_clState *clState = clStates[thr_id];
 	const cl_kernel *kernel = &clState->kernel;
@@ -1614,22 +1614,33 @@ static void opencl_thread_shutdown(struct thr_info *thr)
 	clReleaseContext(clState->context);
 }
 
-struct device_api opencl_api = {
-	.dname = "opencl",
-	.name = "GPU",
-	.api_detect = opencl_detect,
-	.reinit_device = reinit_opencl_device,
+struct device_api& opencl_api() 
+{
+	static struct device_api api=
+	{
+	/*.dname = **/"opencl",
+	/*.name = */"GPU",
+	/*.api_detect = */opencl_detect,
+	/*.reinit_device = */reinit_opencl_device,
 #ifdef HAVE_ADL
-	.get_statline_before = get_opencl_statline_before,
+	/*.get_statline_before = */get_opencl_statline_before,
+#else
+	/*.get_statline_before = */0,
 #endif
-	.get_statline = get_opencl_statline,
-	.thread_prepare = opencl_thread_prepare,
-	.thread_init = opencl_thread_init,
-	.free_work = opencl_free_work,
-	.prepare_work = opencl_prepare_work,
-	.scanhash = opencl_scanhash,
-	.thread_shutdown = opencl_thread_shutdown,
+	/*.get_statline = */get_opencl_statline,
+	/*.get_api_stats = */0,
+	/*.get_stats = */0,
+	/*.thread_prepare = */opencl_thread_prepare,
+	/*.can_limit_work = */0,
+	/*.thread_init = */opencl_thread_init,
+	/*.free_work = */opencl_free_work,
+	/*.prepare_work = */opencl_prepare_work,
+	/*.scanhash = */opencl_scanhash,
+	/*.thread_shutdown = */opencl_thread_shutdown,
+	};
+	return api;
 };
+
 #endif
 
 

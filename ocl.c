@@ -35,9 +35,17 @@
 
 int opt_platform_id = -1;
 
+int getDevType()
+{
+	if( opt_opencl_all )
+	{
+		return CL_DEVICE_TYPE_ALL;
+	}
+	return CL_DEVICE_TYPE_GPU;
+}
 char *file_contents(const char *filename, int *length)
 {
-	char *fullpath = alloca(PATH_MAX);
+	char *fullpath = (char*)alloca(PATH_MAX);
 	void *buffer;
 	FILE *f;
 
@@ -115,7 +123,7 @@ int clDevicesNum(void) {
 		status = clGetPlatformInfo(platform, CL_PLATFORM_VERSION, sizeof(pbuff), pbuff, NULL);
 		if (status == CL_SUCCESS)
 			applog(LOG_INFO, "CL Platform %d version: %s", i, pbuff);
-		status = clGetDeviceIDs(platform, CL_DEVICE_TYPE_GPU, 0, NULL, &numDevices);
+		status = clGetDeviceIDs(platform, getDevType(), 0, NULL, &numDevices);
 		if (status != CL_SUCCESS) {
 			applog(LOG_ERR, "Error %d: Getting Device IDs (num)", status);
 			if (i < numPlatforms - 1)
@@ -132,7 +140,7 @@ int clDevicesNum(void) {
 			char pbuff[256];
 			cl_device_id *devices = (cl_device_id *)malloc(numDevices*sizeof(cl_device_id));
 
-			clGetDeviceIDs(platform, CL_DEVICE_TYPE_GPU, numDevices, devices, NULL);
+			clGetDeviceIDs(platform, getDevType(), numDevices, devices, NULL);
 			for (j = 0; j < numDevices; j++) {
 				clGetDeviceInfo(devices[j], CL_DEVICE_NAME, sizeof(pbuff), pbuff, NULL);
 				applog(LOG_INFO, "\t%i\t%s", j, pbuff);
@@ -149,7 +157,7 @@ int clDevicesNum(void) {
 
 static int advance(char **area, unsigned *remaining, const char *marker)
 {
-	char *find = memmem(*area, *remaining, marker, strlen(marker));
+	char *find = (char*)memmem(*area, *remaining, (void*)marker, strlen(marker));
 
 	if (!find) {
 		applog(LOG_DEBUG, "Marker \"%s\" not found", marker);
@@ -206,7 +214,7 @@ void patch_opcodes(char *w, unsigned remaining)
 
 _clState *initCl(unsigned int gpu, char *name, size_t nameSize)
 {
-	_clState *clState = calloc(1, sizeof(_clState));
+	_clState *clState = (_clState *)calloc(1, sizeof(_clState));
 	bool patchbfi = false, prog_built = false;
 	struct cgpu_info *cgpu = &gpus[gpu];
 	cl_platform_id platform = NULL;
@@ -217,6 +225,13 @@ _clState *initCl(unsigned int gpu, char *name, size_t nameSize)
 	cl_uint numPlatforms;
 	cl_uint numDevices;
 	cl_int status;
+	unsigned int i;
+	cl_context_properties cps[3];
+	char *find;
+	char * extensions;
+	const char * camo = "cl_amd_media_ops";
+	char * devoclver;
+	const char * ocl10 = "OpenCL 1.0";
 
 	status = clGetPlatformIDs(0, NULL, &numPlatforms);
 	if (status != CL_SUCCESS) {
@@ -256,7 +271,7 @@ _clState *initCl(unsigned int gpu, char *name, size_t nameSize)
 	if (status == CL_SUCCESS)
 		applog(LOG_INFO, "CL Platform version: %s", vbuff);
 
-	status = clGetDeviceIDs(platform, CL_DEVICE_TYPE_GPU, 0, NULL, &numDevices);
+	status = clGetDeviceIDs(platform, getDevType(), 0, NULL, &numDevices);
 	if (status != CL_SUCCESS) {
 		applog(LOG_ERR, "Error %d: Getting Device IDs (num)", status);
 		return NULL;
@@ -267,7 +282,7 @@ _clState *initCl(unsigned int gpu, char *name, size_t nameSize)
 
 		/* Now, get the device list data */
 
-		status = clGetDeviceIDs(platform, CL_DEVICE_TYPE_GPU, numDevices, devices, NULL);
+		status = clGetDeviceIDs(platform, getDevType(), numDevices, devices, NULL);
 		if (status != CL_SUCCESS) {
 			applog(LOG_ERR, "Error %d: Getting Device IDs (list)", status);
 			return NULL;
@@ -275,7 +290,6 @@ _clState *initCl(unsigned int gpu, char *name, size_t nameSize)
 
 		applog(LOG_INFO, "List of devices:");
 
-		unsigned int i;
 		for (i = 0; i < numDevices; i++) {
 			status = clGetDeviceInfo(devices[i], CL_DEVICE_NAME, sizeof(pbuff), pbuff, NULL);
 			if (status != CL_SUCCESS) {
@@ -302,9 +316,11 @@ _clState *initCl(unsigned int gpu, char *name, size_t nameSize)
 
 	} else return NULL;
 
-	cl_context_properties cps[3] = { CL_CONTEXT_PLATFORM, (cl_context_properties)platform, 0 };
+	cps[0] = CL_CONTEXT_PLATFORM;
+	cps[1] = (cl_context_properties)platform;
+	cps[2] = 0;
 
-	clState->context = clCreateContextFromType(cps, CL_DEVICE_TYPE_GPU, NULL, NULL, &status);
+	clState->context = clCreateContextFromType(cps, getDevType(), NULL, NULL, &status);
 	if (status != CL_SUCCESS) {
 		applog(LOG_ERR, "Error %d: Creating Context. (clCreateContextFromType)", status);
 		return NULL;
@@ -324,9 +340,7 @@ _clState *initCl(unsigned int gpu, char *name, size_t nameSize)
 
 	/* Check for BFI INT support. Hopefully people don't mix devices with
 	 * and without it! */
-	char * extensions = malloc(1024);
-	const char * camo = "cl_amd_media_ops";
-	char *find;
+	extensions = (char*)malloc(1024);
 
 	status = clGetDeviceInfo(devices[gpu], CL_DEVICE_EXTENSIONS, 1024, (void *)extensions, NULL);
 	if (status != CL_SUCCESS) {
@@ -338,8 +352,7 @@ _clState *initCl(unsigned int gpu, char *name, size_t nameSize)
 		clState->hasBitAlign = true;
 		
 	/* Check for OpenCL >= 1.0 support, needed for global offset parameter usage. */
-	char * devoclver = malloc(1024);
-	const char * ocl10 = "OpenCL 1.0";
+	devoclver = (char*)malloc(1024);
 
 	status = clGetDeviceInfo(devices[gpu], CL_DEVICE_VERSION, 1024, (void *)devoclver, NULL);
 	if (status != CL_SUCCESS) {
@@ -524,12 +537,12 @@ _clState *initCl(unsigned int gpu, char *name, size_t nameSize)
 	if (!source)
 		return NULL;
 
-	binary_sizes = calloc(sizeof(size_t) * MAX_GPUDEVICES * 4, 1);
+	binary_sizes = (size_t*)calloc(sizeof(size_t) * MAX_GPUDEVICES * 4, 1);
 	if (unlikely(!binary_sizes)) {
 		applog(LOG_ERR, "Unable to calloc binary_sizes");
 		return NULL;
 	}
-	binaries = calloc(sizeof(char *) * MAX_GPUDEVICES * 4, 1);
+	binaries = (char**)calloc(sizeof(char *) * MAX_GPUDEVICES * 4, 1);
 	if (unlikely(!binaries)) {
 		applog(LOG_ERR, "Unable to calloc binaries");
 		return NULL;
@@ -608,7 +621,7 @@ build:
 	}
 
 	/* create a cl program executable for all the devices specified */
-	char *CompilerOptions = calloc(1, 256);
+	char *CompilerOptions = (char*)calloc(1, 256);
 
 #ifdef USE_SCRYPT
 	if (opt_scrypt)
@@ -663,7 +676,7 @@ build:
 		size_t logSize;
 		status = clGetProgramBuildInfo(clState->program, devices[gpu], CL_PROGRAM_BUILD_LOG, 0, NULL, &logSize);
 
-		char *log = malloc(logSize);
+		char *log = (char*)malloc(logSize);
 		status = clGetProgramBuildInfo(clState->program, devices[gpu], CL_PROGRAM_BUILD_LOG, logSize, log, NULL);
 		applog(LOG_ERR, "%s", log);
 		return NULL;
@@ -696,7 +709,7 @@ build:
 		applog(LOG_ERR, "OpenCL compiler generated a zero sized binary, FAIL!");
 		return NULL;
 	}
-	binaries[slot] = calloc(sizeof(char) * binary_sizes[slot], 1);
+	binaries[slot] = (char*)calloc(sizeof(char) * binary_sizes[slot], 1);
 	status = clGetProgramInfo(clState->program, CL_PROGRAM_BINARIES, sizeof(char *) * cpnd, binaries, NULL );
 	if (unlikely(status != CL_SUCCESS)) {
 		applog(LOG_ERR, "Error %d: Getting program info. CL_PROGRAM_BINARIES (clGetProgramInfo)", status);
@@ -784,7 +797,7 @@ built:
 			size_t logSize;
 			status = clGetProgramBuildInfo(clState->program, devices[gpu], CL_PROGRAM_BUILD_LOG, 0, NULL, &logSize);
 
-			char *log = malloc(logSize);
+			char *log = (char*)malloc(logSize);
 			status = clGetProgramBuildInfo(clState->program, devices[gpu], CL_PROGRAM_BUILD_LOG, logSize, log, NULL);
 			applog(LOG_ERR, "%s", log);
 			return NULL;
