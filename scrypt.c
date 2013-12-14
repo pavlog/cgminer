@@ -416,7 +416,7 @@ bool scrypt_test(unsigned char *pdata, const unsigned char *ptarget, uint32_t no
 
 	be32enc_vect(data, (const uint32_t *)pdata, 19);
 	data[19] = byteswap(nonce);
-	scratchbuf = alloca(131584);
+	scratchbuf = (char*)alloca(131584);
 	tmp_hash7 = scrypt_1024_1_1_256_sp(data, scratchbuf);
 
 	return (tmp_hash7 <= Htarg);
@@ -436,7 +436,7 @@ bool scanhash_scrypt(struct thr_info *thr, const unsigned char __maybe_unused *p
 
 	be32enc_vect(data, (const uint32_t *)pdata, 19);
 
-	scratchbuf = malloc(131583);
+	scratchbuf = (char*)malloc(131583);
 	if (unlikely(!scratchbuf)) {
 		applog(LOG_ERR, "Failed to malloc scratchbuf in scanhash_scrypt");
 		return ret;
