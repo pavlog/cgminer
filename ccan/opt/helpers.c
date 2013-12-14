@@ -5,13 +5,48 @@
 #include <stdio.h>
 #include "private.h"
 
+#if defined(_MSC_VER)
+#include <stdio.h>
+#include <string.h>
+#include <ctype.h>
+
+inline int strcasecmp(const char *s1, const char *s2)
+{
+	unsigned char c1,c2;
+	do {
+		c1 = *s1++;
+		c2 = *s2++;
+		c1 = (unsigned char) tolower( (unsigned char) c1);
+		c2 = (unsigned char) tolower( (unsigned char) c2);
+	}
+	while((c1 == c2) && (c1 != '\0'));
+	return (int) c1-c2;
+}
+
+inline int strncasecmp(const char *s1,	const char *s2, size_t n)
+{
+	if (n == 0)
+		return 0;
+
+	while (n-- != 0 && tolower(*s1) == tolower(*s2))
+	{
+		if (n == 0 || *s1 == '\0' || *s2 == '\0')
+			break;
+		s1++;
+		s2++;
+	}
+
+	return tolower(*(unsigned char *) s1) - tolower(*(unsigned char *) s2);
+}
+#endif
+
 /* Upper bound to sprintf this simple type?  Each 3 bits < 1 digit. */
 #define CHAR_SIZE(type) (((sizeof(type)*CHAR_BIT + 2) / 3) + 1)
 
 /* FIXME: asprintf module? */
 static char *arg_bad(const char *fmt, const char *arg)
 {
-	char *str = malloc(strlen(fmt) + strlen(arg));
+	char *str = (char*)malloc(strlen(fmt) + strlen(arg));
 	sprintf(str, fmt, arg);
 	return str;
 }
@@ -74,7 +109,7 @@ char *opt_set_floatval(const char *arg, float *f)
 	char *endp;
 
 	errno = 0;
-	*f = strtof(arg, &endp);
+	*f = strtod(arg, &endp);
 	if (*endp || !arg[0])
 		return arg_bad("'%s' is not a number", arg);
 	if (errno)
@@ -84,15 +119,16 @@ char *opt_set_floatval(const char *arg, float *f)
 
 char *opt_set_uintval(const char *arg, unsigned int *ui)
 {
-	int i;
-	char *err = opt_set_intval(arg, &i);
+	unsigned long l;
+	char *err = opt_set_ulongval(arg, &l);
 
 	if (err)
 		return err;
-	if (i < 0)
-		return arg_bad("'%s' is negative", arg);
-	*ui = i;
-	return NULL;
+	*ui = l;
+	/* Beware truncation... */
+	if (*ui != l)
+		return arg_bad("value '%s' does not fit into an integer", arg);
+	return err;
 }
 
 char *opt_set_longval(const char *arg, long *l)
@@ -111,15 +147,15 @@ char *opt_set_longval(const char *arg, long *l)
 
 char *opt_set_ulongval(const char *arg, unsigned long *ul)
 {
-	long int l;
-	char *err;
-	
-	err = opt_set_longval(arg, &l);
-	if (err)
-		return err;
-	*ul = l;
-	if (l < 0)
-		return arg_bad("'%s' is negative", arg);
+	char *endp;
+
+	/* This is how the manpage says to do it.  Yech. */
+	errno = 0;
+	*ul = strtoul(arg, &endp, 0);
+	if (*endp || !arg[0])
+		return arg_bad("'%s' is not a number", arg);
+	if (errno)
+		return arg_bad("'%s' is out of range", arg);
 	return NULL;
 }
 

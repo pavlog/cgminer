@@ -248,7 +248,7 @@ char *opt_usage(const char *argv0, const char *extra);
  * This can be used as the desc parameter if you want an option not to be
  * shown by opt_usage().
  */
-extern const char opt_hidden[];
+extern const char opt_hidden[1];
 
 /* Maximum length of arg to show in opt_usage */
 #define OPT_SHOW_LEN 80
