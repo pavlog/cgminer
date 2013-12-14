@@ -12,7 +12,6 @@
 #ifdef HAVE_OPENCL
 
 #include <stdio.h>
-#include <inttypes.h>
 #include <pthread.h>
 #include <string.h>
 
@@ -247,6 +246,7 @@ static void *postcalc_hash(void *userdata)
 
 		if (nonce) {
 			applog(LOG_DEBUG, "OCL NONCE %u", nonce);
+			applog(LOG_WARNING, "OCL NONCE %u", nonce);
 			if (opt_scrypt)
 				send_scrypt_nonce(pcd, nonce);
 			else
@@ -268,12 +268,12 @@ static void *postcalc_hash(void *userdata)
 
 void postcalc_hash_async(struct thr_info *thr, struct work *work, uint32_t *res)
 {
-	struct pc_data *pcd = malloc(sizeof(struct pc_data));
+	struct pc_data *pcd = (struct pc_data *)malloc(sizeof(struct pc_data));
 	if (unlikely(!pcd)) {
 		applog(LOG_ERR, "Failed to malloc pc_data in postcalc_hash_async");
 		return;
 	}
-	pcd->work = calloc(1, sizeof(struct work));
+	pcd->work = (struct work *)calloc(1, sizeof(struct work));
 	if (unlikely(!pcd->work)) {
 		applog(LOG_ERR, "Failed to malloc work in postcalc_hash_async");
 		return;
