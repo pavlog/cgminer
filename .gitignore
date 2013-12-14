@@ -41,3 +41,7 @@ lib/string.h
 lib/warn-on-use.h
 
 mkinstalldirs
+/*.bin
+/*.user
+/x64
+/*.log
