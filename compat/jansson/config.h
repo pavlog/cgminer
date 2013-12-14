@@ -5,7 +5,7 @@
 #define HAVE_DLFCN_H 1
 
 /* Define to 1 if you have the <inttypes.h> header file. */
-#define HAVE_INTTYPES_H 1
+//#define HAVE_INTTYPES_H 1
 
 /* Define to 1 if you have the <memory.h> header file. */
 #define HAVE_MEMORY_H 1
@@ -66,6 +66,15 @@
    calls it, or to nothing if 'inline' is not supported under any name.  */
 #ifndef __cplusplus
 /* #undef inline */
+#endif
+
+#undef inline
+#define inline __inline
+
+#ifdef WIN32
+
+#define snprintf _snprintf
+
 #endif
 
 /* Define to the type of a signed integer type of width exactly 32 bits if

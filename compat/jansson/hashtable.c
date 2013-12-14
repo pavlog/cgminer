@@ -1,28 +1,31 @@
 /*
- * Copyright (c) 2009-2011 Petri Lehtinen <petri@digip.org>
+ * Copyright (c) 2009, 2010 Petri Lehtinen <petri@digip.org>
  *
  * This library is free software; you can redistribute it and/or modify
  * it under the terms of the MIT license. See LICENSE for details.
  */
 
+#include <config.h>
+
 #include <stdlib.h>
-#include <jansson_config.h>   /* for JSON_INLINE */
-#include "jansson_private.h"  /* for container_of() */
 #include "hashtable.h"
 
 typedef struct hashtable_list list_t;
 typedef struct hashtable_pair pair_t;
 typedef struct hashtable_bucket bucket_t;
 
+#define container_of(ptr_, type_, member_)                      \
+    ((type_ *)((char *)ptr_ - (size_t)&((type_ *)0)->member_))
+
 #define list_to_pair(list_)  container_of(list_, pair_t, list)
 
-static JSON_INLINE void list_init(list_t *list)
+static inline void list_init(list_t *list)
 {
     list->next = list;
     list->prev = list;
 }
 
-static JSON_INLINE void list_insert(list_t *list, list_t *node)
+static inline void list_insert(list_t *list, list_t *node)
 {
     node->next = list;
     node->prev = list->prev;
@@ -30,13 +33,13 @@ static JSON_INLINE void list_insert(list_t *list, list_t *node)
     list->prev = node;
 }
 
-static JSON_INLINE void list_remove(list_t *list)
+static inline void list_remove(list_t *list)
 {
     list->prev->next = list->next;
     list->next->prev = list->prev;
 }
 
-static JSON_INLINE int bucket_is_empty(hashtable_t *hashtable, bucket_t *bucket)
+static inline int bucket_is_empty(hashtable_t *hashtable, bucket_t *bucket)
 {
     return bucket->first == &hashtable->list && bucket->first == bucket->last;
 }
@@ -56,22 +59,22 @@ static void insert_to_bucket(hashtable_t *hashtable, bucket_t *bucket,
     }
 }
 
-static size_t primes[] = {
+static unsigned int primes[] = {
     5, 13, 23, 53, 97, 193, 389, 769, 1543, 3079, 6151, 12289, 24593,
     49157, 98317, 196613, 393241, 786433, 1572869, 3145739, 6291469,
     12582917, 25165843, 50331653, 100663319, 201326611, 402653189,
     805306457, 1610612741
 };
-static const size_t num_primes = sizeof(primes) / sizeof(size_t);
+static const unsigned int num_primes = sizeof(primes) / sizeof(unsigned int);
 
-static JSON_INLINE size_t num_buckets(hashtable_t *hashtable)
+static inline unsigned int num_buckets(hashtable_t *hashtable)
 {
     return primes[hashtable->num_buckets];
 }
 
 
 static pair_t *hashtable_find_pair(hashtable_t *hashtable, bucket_t *bucket,
-                                   const void *key, size_t hash)
+                                   const void *key, unsigned int hash)
 {
     list_t *list;
     pair_t *pair;
@@ -97,11 +100,11 @@ static pair_t *hashtable_find_pair(hashtable_t *hashtable, bucket_t *bucket,
 
 /* returns 0 on success, -1 if key was not found */
 static int hashtable_do_del(hashtable_t *hashtable,
-                            const void *key, size_t hash)
+                            const void *key, unsigned int hash)
 {
     pair_t *pair;
     bucket_t *bucket;
-    size_t index;
+    unsigned int index;
 
     index = hash % num_buckets(hashtable);
     bucket = &hashtable->buckets[index];
@@ -126,7 +129,7 @@ static int hashtable_do_del(hashtable_t *hashtable,
     if(hashtable->free_value)
         hashtable->free_value(pair->value);
 
-    jsonp_free(pair);
+    free(pair);
     hashtable->size--;
 
     return 0;
@@ -145,7 +148,7 @@ static void hashtable_do_clear(hashtable_t *hashtable)
             hashtable->free_key(pair->key);
         if(hashtable->free_value)
             hashtable->free_value(pair->value);
-        jsonp_free(pair);
+        free(pair);
     }
 }
 
@@ -153,14 +156,14 @@ static int hashtable_do_rehash(hashtable_t *hashtable)
 {
     list_t *list, *next;
     pair_t *pair;
-    size_t i, index, new_size;
+    unsigned int i, index, new_size;
 
-    jsonp_free(hashtable->buckets);
+    free(hashtable->buckets);
 
     hashtable->num_buckets++;
     new_size = num_buckets(hashtable);
 
-    hashtable->buckets = jsonp_malloc(new_size * sizeof(bucket_t));
+    hashtable->buckets = (struct hashtable_bucket *)malloc(new_size * sizeof(bucket_t));
     if(!hashtable->buckets)
         return -1;
 
@@ -187,13 +190,13 @@ static int hashtable_do_rehash(hashtable_t *hashtable)
 hashtable_t *hashtable_create(key_hash_fn hash_key, key_cmp_fn cmp_keys,
                               free_fn free_key, free_fn free_value)
 {
-    hashtable_t *hashtable = jsonp_malloc(sizeof(hashtable_t));
+    hashtable_t *hashtable = (hashtable_t *)malloc(sizeof(hashtable_t));
     if(!hashtable)
         return NULL;
 
     if(hashtable_init(hashtable, hash_key, cmp_keys, free_key, free_value))
     {
-        jsonp_free(hashtable);
+        free(hashtable);
         return NULL;
     }
 
@@ -203,18 +206,18 @@ hashtable_t *hashtable_create(key_hash_fn hash_key, key_cmp_fn cmp_keys,
 void hashtable_destroy(hashtable_t *hashtable)
 {
     hashtable_close(hashtable);
-    jsonp_free(hashtable);
+    free(hashtable);
 }
 
 int hashtable_init(hashtable_t *hashtable,
                    key_hash_fn hash_key, key_cmp_fn cmp_keys,
                    free_fn free_key, free_fn free_value)
 {
-    size_t i;
+    unsigned int i;
 
     hashtable->size = 0;
     hashtable->num_buckets = 0;  /* index to primes[] */
-    hashtable->buckets = jsonp_malloc(num_buckets(hashtable) * sizeof(bucket_t));
+    hashtable->buckets = (struct hashtable_bucket *)malloc(num_buckets(hashtable) * sizeof(bucket_t));
     if(!hashtable->buckets)
         return -1;
 
@@ -237,14 +240,14 @@ int hashtable_init(hashtable_t *hashtable,
 void hashtable_close(hashtable_t *hashtable)
 {
     hashtable_do_clear(hashtable);
-    jsonp_free(hashtable->buckets);
+    free(hashtable->buckets);
 }
 
 int hashtable_set(hashtable_t *hashtable, void *key, void *value)
 {
     pair_t *pair;
     bucket_t *bucket;
-    size_t hash, index;
+    unsigned int hash, index;
 
     /* rehash if the load ratio exceeds 1 */
     if(hashtable->size >= num_buckets(hashtable))
@@ -266,7 +269,7 @@ int hashtable_set(hashtable_t *hashtable, void *key, void *value)
     }
     else
     {
-        pair = jsonp_malloc(sizeof(pair_t));
+        pair = (pair_t *)malloc(sizeof(pair_t));
         if(!pair)
             return -1;
 
@@ -285,7 +288,7 @@ int hashtable_set(hashtable_t *hashtable, void *key, void *value)
 void *hashtable_get(hashtable_t *hashtable, const void *key)
 {
     pair_t *pair;
-    size_t hash;
+    unsigned int hash;
     bucket_t *bucket;
 
     hash = hashtable->hash_key(key);
@@ -300,13 +303,13 @@ void *hashtable_get(hashtable_t *hashtable, const void *key)
 
 int hashtable_del(hashtable_t *hashtable, const void *key)
 {
-    size_t hash = hashtable->hash_key(key);
+    unsigned int hash = hashtable->hash_key(key);
     return hashtable_do_del(hashtable, key, hash);
 }
 
 void hashtable_clear(hashtable_t *hashtable)
 {
-    size_t i;
+    unsigned int i;
 
     hashtable_do_clear(hashtable);
 
@@ -328,7 +331,7 @@ void *hashtable_iter(hashtable_t *hashtable)
 void *hashtable_iter_at(hashtable_t *hashtable, const void *key)
 {
     pair_t *pair;
-    size_t hash;
+    unsigned int hash;
     bucket_t *bucket;
 
     hash = hashtable->hash_key(key);

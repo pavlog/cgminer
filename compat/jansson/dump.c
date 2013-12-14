@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2009-2011 Petri Lehtinen <petri@digip.org>
+ * Copyright (c) 2009, 2010 Petri Lehtinen <petri@digip.org>
  *
  * Jansson is free software; you can redistribute it and/or modify
  * it under the terms of the MIT license. See LICENSE for details.
@@ -41,10 +41,10 @@ static int dump_to_file(const char *buffer, int size, void *data)
     return 0;
 }
 
-/* 32 spaces (the maximum indentation size) */
-static char whitespace[] = "                                ";
+/* 256 spaces (the maximum indentation size) */
+static char whitespace[] = "                                                                                                                                                                                                                                                                ";
 
-static int dump_indent(size_t flags, int depth, int space, dump_func dump, void *data)
+static int dump_indent(unsigned long flags, int depth, int space, dump_func dump, void *data)
 {
     if(JSON_INDENT(flags) > 0)
     {
@@ -165,7 +165,7 @@ static int object_key_compare_serials(const void *key1, const void *key2)
            (*(const object_key_t **)key2)->serial;
 }
 
-static int do_dump(const json_t *json, size_t flags, int depth,
+static int do_dump(const json_t *json, unsigned long flags, int depth,
                    dump_func dump, void *data)
 {
     int ascii = flags & JSON_ENSURE_ASCII ? 1 : 0;
@@ -185,9 +185,7 @@ static int do_dump(const json_t *json, size_t flags, int depth,
             char buffer[MAX_INTEGER_STR_LENGTH];
             int size;
 
-            size = snprintf(buffer, MAX_INTEGER_STR_LENGTH,
-                            "%" JSON_INTEGER_FORMAT,
-                            json_integer_value(json));
+            size = snprintf(buffer, MAX_INTEGER_STR_LENGTH, "%d", json_integer_value(json));
             if(size >= MAX_INTEGER_STR_LENGTH)
                 return -1;
 
@@ -309,11 +307,12 @@ static int do_dump(const json_t *json, size_t flags, int depth,
             if(flags & JSON_SORT_KEYS || flags & JSON_PRESERVE_ORDER)
             {
                 const object_key_t **keys;
-                size_t size, i;
+                unsigned int size;
+                unsigned int i;
                 int (*cmp_func)(const void *, const void *);
 
                 size = json_object_size(json);
-                keys = jsonp_malloc(size * sizeof(object_key_t *));
+                keys = (const object_key_t **)malloc(size * sizeof(object_key_t *));
                 if(!keys)
                     goto object_error;
 
@@ -346,7 +345,7 @@ static int do_dump(const json_t *json, size_t flags, int depth,
                     if(dump(separator, separator_length, data) ||
                        do_dump(value, flags, depth + 1, dump, data))
                     {
-                        jsonp_free(keys);
+                        free(keys);
                         goto object_error;
                     }
 
@@ -355,7 +354,7 @@ static int do_dump(const json_t *json, size_t flags, int depth,
                         if(dump(",", 1, data) ||
                            dump_indent(flags, depth + 1, 1, dump, data))
                         {
-                            jsonp_free(keys);
+                            free(keys);
                             goto object_error;
                         }
                     }
@@ -363,13 +362,13 @@ static int do_dump(const json_t *json, size_t flags, int depth,
                     {
                         if(dump_indent(flags, depth, 0, dump, data))
                         {
-                            jsonp_free(keys);
+                            free(keys);
                             goto object_error;
                         }
                     }
                 }
 
-                jsonp_free(keys);
+                free(keys);
             }
             else
             {
@@ -416,15 +415,13 @@ static int do_dump(const json_t *json, size_t flags, int depth,
 }
 
 
-char *json_dumps(const json_t *json, size_t flags)
+char *json_dumps(const json_t *json, unsigned long flags)
 {
     strbuffer_t strbuff;
     char *result;
 
-    if(!(flags & JSON_ENCODE_ANY)) {
-        if(!json_is_array(json) && !json_is_object(json))
-           return NULL;
-    }
+    if(!json_is_array(json) && !json_is_object(json))
+        return NULL;
 
     if(strbuffer_init(&strbuff))
         return NULL;
@@ -434,23 +431,21 @@ char *json_dumps(const json_t *json, size_t flags)
         return NULL;
     }
 
-    result = jsonp_strdup(strbuffer_value(&strbuff));
+    result = strdup(strbuffer_value(&strbuff));
     strbuffer_close(&strbuff);
 
     return result;
 }
 
-int json_dumpf(const json_t *json, FILE *output, size_t flags)
+int json_dumpf(const json_t *json, FILE *output, unsigned long flags)
 {
-    if(!(flags & JSON_ENCODE_ANY)) {
-        if(!json_is_array(json) && !json_is_object(json))
-           return -1;
-    }
+    if(!json_is_array(json) && !json_is_object(json))
+        return -1;
 
     return do_dump(json, flags, 0, dump_to_file, (void *)output);
 }
 
-int json_dump_file(const json_t *json, const char *path, size_t flags)
+int json_dump_file(const json_t *json, const char *path, unsigned long flags)
 {
     int result;
 
