@@ -393,7 +393,7 @@ static void sharelog(const char*disposition, const struct work*work)
 	struct timeval tv__;
 	tv__.tv_sec = t;
 	get_datestamp(blocktime, &tv__);
-	rv = snprintf(s, sizeof(s), "%s,%lu,%lu,%s,%s,%s,%s%u,%u,%s,%s\n", blocktime, work->blk.nonce, t, disposition, target, pool->rpc_url, cgpu->api->name, cgpu->device_id, thr_id, hash, data);
+	rv = snprintf(s, sizeof(s), "%s %lu,%lu,%lu,%s,%s,%s,%s%u,%u,%s,%s\n", blocktime, work->blk.nonce, work->blk.ntime,t, disposition, target, pool->rpc_url, cgpu->api->name, cgpu->device_id, thr_id, hash, data);
 	//
 	free(target);
 	free(hash);

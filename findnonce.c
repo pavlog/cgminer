@@ -246,7 +246,7 @@ static void *postcalc_hash(void *userdata)
 
 		if (nonce) {
 			applog(LOG_DEBUG, "OCL NONCE %u", nonce);
-			applog(LOG_WARNING, "OCL NONCE %u", nonce);
+			//applog(LOG_WARNING, "OCL NONCE %u", nonce);
 			if (opt_scrypt)
 				send_scrypt_nonce(pcd, nonce);
 			else
