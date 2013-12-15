@@ -438,9 +438,18 @@ static int lex_scan_number(lex_t *lex, char c, json_error_t *error)
         value = strtol(saved_text, &end, 10);
         assert(end == saved_text + lex->saved_text.length);
 
-        if((value == LONG_MAX && errno == ERANGE) || value > INT_MAX) {
-            error_set(error, lex, "too big integer");
-            goto out;
+        if((value == LONG_MAX && errno == ERANGE) || value > INT_MAX) 
+		{
+			unsigned long uvalue = strtoul(saved_text, &end, 10);
+			if( !(uvalue>value) ) 
+			{
+				error_set(error, lex, "too big integer");
+				goto out;
+			}
+			else
+			{
+				value = uvalue;
+			}
         }
         else if((value == LONG_MIN && errno == ERANGE) || value < INT_MIN) {
             error_set(error, lex, "too big negative integer");
