@@ -59,3 +59,5 @@ mkinstalldirs
 *.plist
 
 cgminer.xcodeproj/project.xcworkspace/xcuserdata/pasha.xcuserdatad/UserInterfaceState.xcuserstate
+
+*.xcsettings

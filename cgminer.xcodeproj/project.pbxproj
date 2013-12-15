@@ -7,7 +7,6 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		8DD76F6A0486A84900D96B5E /* cgminer.1 in CopyFiles */ = {isa = PBXBuildFile; fileRef = C6859E8B029090EE04C91782 /* cgminer.1 */; };
 		C44414BF185D0B1400B60092 /* sha256_generic.c in Sources */ = {isa = PBXBuildFile; fileRef = C44414B9185D0B1400B60092 /* sha256_generic.c */; };
 		C44414EB185D0B5500B60092 /* adl.c in Sources */ = {isa = PBXBuildFile; fileRef = C44414C5185D0B5500B60092 /* adl.c */; };
 		C44414EC185D0B5500B60092 /* api.c in Sources */ = {isa = PBXBuildFile; fileRef = C44414C7185D0B5500B60092 /* api.c */; };
@@ -34,6 +33,11 @@
 		C444151C185E534800B60092 /* value.c in Sources */ = {isa = PBXBuildFile; fileRef = C4441516185E534800B60092 /* value.c */; };
 		C444151F185E538500B60092 /* utf.c in Sources */ = {isa = PBXBuildFile; fileRef = C444151D185E538500B60092 /* utf.c */; };
 		C4441523185E540100B60092 /* libcurl.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = C4441522185E540100B60092 /* libcurl.dylib */; };
+		C4441540185E5D0E00B60092 /* diablo120724.cl in CopyFiles */ = {isa = PBXBuildFile; fileRef = C4441533185E5C9200B60092 /* diablo120724.cl */; };
+		C4441541185E5D0E00B60092 /* diakgcn120724.cl in CopyFiles */ = {isa = PBXBuildFile; fileRef = C4441534185E5C9200B60092 /* diakgcn120724.cl */; };
+		C4441542185E5D0E00B60092 /* phatk120724.cl in CopyFiles */ = {isa = PBXBuildFile; fileRef = C4441536185E5C9200B60092 /* phatk120724.cl */; };
+		C4441543185E5D0E00B60092 /* poclbm120724.cl in CopyFiles */ = {isa = PBXBuildFile; fileRef = C4441537185E5C9200B60092 /* poclbm120724.cl */; };
+		C4441544185E5D0E00B60092 /* scrypt120724.cl in CopyFiles */ = {isa = PBXBuildFile; fileRef = C4441538185E5C9200B60092 /* scrypt120724.cl */; };
 		C495E825152BDA7B005B2C99 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C495E824152BDA7B005B2C99 /* Foundation.framework */; };
 		C495E828152BDBD2005B2C99 /* QuartzCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C495E827152BDBD2005B2C99 /* QuartzCore.framework */; };
 /* End PBXBuildFile section */
@@ -41,13 +45,17 @@
 /* Begin PBXCopyFilesBuildPhase section */
 		8DD76F690486A84900D96B5E /* CopyFiles */ = {
 			isa = PBXCopyFilesBuildPhase;
-			buildActionMask = 8;
-			dstPath = /usr/share/man/man1/;
-			dstSubfolderSpec = 0;
+			buildActionMask = 12;
+			dstPath = "";
+			dstSubfolderSpec = 16;
 			files = (
-				8DD76F6A0486A84900D96B5E /* cgminer.1 in CopyFiles */,
+				C4441540185E5D0E00B60092 /* diablo120724.cl in CopyFiles */,
+				C4441541185E5D0E00B60092 /* diakgcn120724.cl in CopyFiles */,
+				C4441542185E5D0E00B60092 /* phatk120724.cl in CopyFiles */,
+				C4441543185E5D0E00B60092 /* poclbm120724.cl in CopyFiles */,
+				C4441544185E5D0E00B60092 /* scrypt120724.cl in CopyFiles */,
 			);
-			runOnlyForDeploymentPostprocessing = 1;
+			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXCopyFilesBuildPhase section */
 
@@ -105,9 +113,13 @@
 		C444151E185E538500B60092 /* utf.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = utf.h; path = compat/jansson/utf.h; sourceTree = "<group>"; };
 		C4441520185E53EE00B60092 /* libcurl.4.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = libcurl.4.dylib; path = usr/lib/libcurl.4.dylib; sourceTree = SDKROOT; };
 		C4441522185E540100B60092 /* libcurl.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = libcurl.dylib; path = usr/lib/libcurl.dylib; sourceTree = SDKROOT; };
+		C4441533185E5C9200B60092 /* diablo120724.cl */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.opencl; path = diablo120724.cl; sourceTree = "<group>"; };
+		C4441534185E5C9200B60092 /* diakgcn120724.cl */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.opencl; path = diakgcn120724.cl; sourceTree = "<group>"; };
+		C4441536185E5C9200B60092 /* phatk120724.cl */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.opencl; path = phatk120724.cl; sourceTree = "<group>"; };
+		C4441537185E5C9200B60092 /* poclbm120724.cl */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.opencl; path = poclbm120724.cl; sourceTree = "<group>"; };
+		C4441538185E5C9200B60092 /* scrypt120724.cl */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.opencl; path = scrypt120724.cl; sourceTree = "<group>"; };
 		C495E824152BDA7B005B2C99 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = System/Library/Frameworks/Foundation.framework; sourceTree = SDKROOT; };
 		C495E827152BDBD2005B2C99 /* QuartzCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = QuartzCore.framework; path = System/Library/Frameworks/QuartzCore.framework; sourceTree = SDKROOT; };
-		C6859E8B029090EE04C91782 /* cgminer.1 */ = {isa = PBXFileReference; lastKnownFileType = text.man; path = cgminer.1; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -128,13 +140,13 @@
 		08FB7794FE84155DC02AAC07 /* cgminer */ = {
 			isa = PBXGroup;
 			children = (
+				C444153F185E5CE200B60092 /* OpenCL */,
 				C4441522185E540100B60092 /* libcurl.dylib */,
 				C4441520185E53EE00B60092 /* libcurl.4.dylib */,
 				C4441507185E531900B60092 /* OpenCL.framework */,
 				C495E827152BDBD2005B2C99 /* QuartzCore.framework */,
 				C495E824152BDA7B005B2C99 /* Foundation.framework */,
 				08FB7795FE84155DC02AAC07 /* Source */,
-				C6859E8C029090F304C91782 /* Documentation */,
 				1AB674ADFE9D54B511CA2CBB /* Products */,
 			);
 			name = cgminer;
@@ -220,12 +232,16 @@
 			name = jansson;
 			sourceTree = "<group>";
 		};
-		C6859E8C029090F304C91782 /* Documentation */ = {
+		C444153F185E5CE200B60092 /* OpenCL */ = {
 			isa = PBXGroup;
 			children = (
-				C6859E8B029090EE04C91782 /* cgminer.1 */,
+				C4441533185E5C9200B60092 /* diablo120724.cl */,
+				C4441534185E5C9200B60092 /* diakgcn120724.cl */,
+				C4441536185E5C9200B60092 /* phatk120724.cl */,
+				C4441537185E5C9200B60092 /* poclbm120724.cl */,
+				C4441538185E5C9200B60092 /* scrypt120724.cl */,
 			);
-			name = Documentation;
+			name = OpenCL;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -255,7 +271,7 @@
 		08FB7793FE84155DC02AAC07 /* Project object */ = {
 			isa = PBXProject;
 			attributes = {
-				LastUpgradeCheck = 0420;
+				LastUpgradeCheck = 0500;
 			};
 			buildConfigurationList = 1DEB923508733DC60010E9CD /* Build configuration list for PBXProject "cgminer" */;
 			compatibilityVersion = "Xcode 3.2";
@@ -315,7 +331,6 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = YES;
-				ARCHS = "$(ARCHS_STANDARD_64_BIT)";
 				COPY_PHASE_STRIP = NO;
 				EXCLUDED_RECURSIVE_SEARCH_PATH_SUBDIRECTORIES = "*.nib *.lproj *.framework *.gch *.xcode* (*) .DS_Store CVS .svn .git .hg winbuild";
 				GCC_C_LANGUAGE_STANDARD = "compiler-default";
@@ -345,7 +360,6 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = YES;
-				ARCHS = "$(ARCHS_STANDARD_64_BIT)";
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				EXCLUDED_RECURSIVE_SEARCH_PATH_SUBDIRECTORIES = "*.nib *.lproj *.framework *.gch *.xcode* (*) .DS_Store CVS .svn .git .hg winbuild";
 				GCC_C_LANGUAGE_STANDARD = "compiler-default";
@@ -372,7 +386,6 @@
 		1DEB923608733DC60010E9CD /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ARCHS = "$(ARCHS_STANDARD_32_BIT)";
 				GCC_C_LANGUAGE_STANDARD = gnu99;
 				GCC_ENABLE_CPP_RTTI = NO;
 				GCC_OPTIMIZATION_LEVEL = 0;
@@ -391,7 +404,6 @@
 		1DEB923708733DC60010E9CD /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ARCHS = "$(ARCHS_STANDARD_32_BIT)";
 				GCC_C_LANGUAGE_STANDARD = gnu99;
 				GCC_ENABLE_CPP_RTTI = NO;
 				GCC_WARN_ABOUT_RETURN_TYPE = YES;
