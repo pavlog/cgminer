@@ -534,7 +534,7 @@ struct CODES {
  { SEVERITY_ERR,   MSG_MISBOOL,	PARAM_NONE,	"Missing parameter: true/false" },
  { SEVERITY_ERR,   MSG_INVBOOL,	PARAM_NONE,	"Invalid parameter should be true or false" },
  { SEVERITY_SUCC,  MSG_FOO,	PARAM_BOOL,	"Failover-Only set to %s" },
- { SEVERITY_FAIL, 0, (code_parameters)0, NULL }
+ { SEVERITY_FAIL, 0, (enum code_parameters)0, NULL }
 };
 
 static int my_thr_id = 0;

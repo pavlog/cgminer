@@ -531,6 +531,7 @@ _clState *initCl(unsigned int gpu, char *name, size_t nameSize)
 	char *source = file_contents(filename, &pl);
 	size_t sourceSize[] = {(size_t)pl};
 	cl_uint slot, cpnd;
+	char *CompilerOptions;
 
 	slot = cpnd = 0;
 
@@ -621,7 +622,7 @@ build:
 	}
 
 	/* create a cl program executable for all the devices specified */
-	char *CompilerOptions = (char*)calloc(1, 256);
+	CompilerOptions = (char*)calloc(1, 256);
 
 #ifdef USE_SCRYPT
 	if (opt_scrypt)

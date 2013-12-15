@@ -24,7 +24,7 @@
 #ifndef WIN32
 #include <sys/resource.h>
 #endif
-#include <ccan/opt/opt.h>
+#include "ccan/opt/opt.h"
 
 #include "compat.h"
 #include "miner.h"
@@ -595,12 +595,12 @@ char *set_intensity(char *arg)
 
 
 #ifdef HAVE_OPENCL
-struct device_api& opencl_api();
+struct device_api* opencl_api();
 
 char *print_ndevs_and_exit(int *ndevs)
 {
 	opt_log_output = true;
-	opencl_api().api_detect();
+	opencl_api()->api_detect();
 	clear_adl(*ndevs);
 	applog(LOG_INFO, "%i GPU devices max detected", *ndevs);
 	exit(*ndevs);
@@ -1157,7 +1157,7 @@ select_cgpu:
 	for (thr_id = 0; thr_id < mining_threads; ++thr_id) {
 		thr = &thr_info[thr_id];
 		cgpu = thr->cgpu;
-		if (cgpu->api != &opencl_api())
+		if (cgpu->api != opencl_api())
 			continue;
 		if (dev_from_id(thr_id) != gpu)
 			continue;
@@ -1182,7 +1182,7 @@ select_cgpu:
 
 		thr = &thr_info[thr_id];
 		cgpu = thr->cgpu;
-		if (cgpu->api != &opencl_api())
+		if (cgpu->api != opencl_api())
 			continue;
 		if (dev_from_id(thr_id) != gpu)
 			continue;
@@ -1219,7 +1219,7 @@ select_cgpu:
 	for (thr_id = 0; thr_id < mining_threads; ++thr_id) {
 		thr = &thr_info[thr_id];
 		cgpu = thr->cgpu;
-		if (cgpu->api != &opencl_api())
+		if (cgpu->api != opencl_api())
 			continue;
 		if (dev_from_id(thr_id) != gpu)
 			continue;
@@ -1260,7 +1260,7 @@ static void opencl_detect()
 
 		cgpu = &gpus[i];
 		cgpu->deven = DEV_ENABLED;
-		cgpu->api = &opencl_api();
+		cgpu->api = opencl_api();
 		cgpu->device_id = i;
 		cgpu->threads = opt_g_threads;
 		cgpu->virtual_gpu = i;
@@ -1614,7 +1614,7 @@ static void opencl_thread_shutdown(struct thr_info *thr)
 	clReleaseContext(clState->context);
 }
 
-struct device_api& opencl_api() 
+struct device_api* opencl_api()
 {
 	static struct device_api api=
 	{
@@ -1638,7 +1638,7 @@ struct device_api& opencl_api()
 	/*.scanhash = */opencl_scanhash,
 	/*.thread_shutdown = */opencl_thread_shutdown,
 	};
-	return api;
+	return &api;
 };
 
 #endif

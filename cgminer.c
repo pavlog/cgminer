@@ -35,10 +35,10 @@
 #ifndef WIN32
 #include <sys/resource.h>
 #endif
-#include <ccan/opt/opt.h>
+#include "ccan/opt/opt.h"
 #include <jansson.h>
 #include <curl/curl.h>
-//#include <libgen.h>
+#include <libgen.h>
 #include <sha2.h>
 
 #include "compat.h"
@@ -214,7 +214,7 @@ static
 #ifndef HAVE_CURSES
 const
 #endif
-bool curses_active;
+bool curses_active=false;
 
 static char current_block[37];
 static char *current_hash;
@@ -1073,9 +1073,9 @@ static struct opt_table opt_config_table[] = {
 	OPT_WITH_ARG("--nonce-split",
 			opt_set_uintval, NULL, &opt_nonce_split,
 			"Nonce split across threads (default: 1)"),
-	OPT_WITH_ARG("--opencl-all",
-			opt_set_bool, NULL, &opt_opencl_all,
-			"Enumerates all opencl devices (including cpu) (default: 0)"),
+	OPT_WITHOUT_ARG("--opencl-all",
+			opt_set_bool, &opt_opencl_all,
+			"Enumerates all opencl devices (including cpu)"),
 	OPT_ENDTABLE
 };
 
@@ -5271,7 +5271,7 @@ void enable_device(struct cgpu_info *cgpu)
 	adj_width(mining_threads, &dev_width);
 #endif
 #ifdef HAVE_OPENCL
-	if (cgpu->api == &opencl_api()) {
+	if (cgpu->api == opencl_api()) {
 		gpu_threads += cgpu->threads;
 	}
 #endif
@@ -5320,7 +5320,7 @@ int main(int argc, char *argv[])
 	if (unlikely(curl_global_init(CURL_GLOBAL_ALL)))
 		quit(1, "Failed to curl_global_init");
 
-	initial_args = (const char **)malloc(sizeof(char *) * (argc + 1));
+	initial_args = (char **)malloc(sizeof(char *) * (argc + 1));
 	for  (i = 0; i < argc; i++)
 		initial_args[i] = strdup(argv[i]);
 	initial_args[argc] = NULL;
@@ -5354,21 +5354,21 @@ int main(int argc, char *argv[])
 	opt_kernel_path = (char*)alloca(PATH_MAX);
 	strcpy(opt_kernel_path, CGMINER_PREFIX);
 
-#if !defined(_MSC_VER)
+#if defined(_MSC_VER)
+	cgminer_path = (char*)alloca(PATH_MAX);
+	GetCurrentDirectory(PATH_MAX-1,cgminer_path);
+#else
 	handler.sa_handler = &sighandler;
 	handler.sa_flags = 0;
 	sigemptyset(&handler.sa_mask);
 	sigaction(SIGTERM, &handler, &termhandler);
 	sigaction(SIGINT, &handler, &inthandler);
-
+	
 	cgminer_path = (char*)alloca(PATH_MAX);
 	s = strdup(argv[0]);
 	strcpy(cgminer_path, dirname(s));
 	free(s);
 	strcat(cgminer_path, "/");
-#else
-	cgminer_path = (char*)alloca(PATH_MAX);
-	GetCurrentDirectory(PATH_MAX-1,cgminer_path);
 #endif
 
 #ifdef WANT_CPUMINE
@@ -5507,7 +5507,7 @@ int main(int argc, char *argv[])
 
 #ifdef HAVE_OPENCL
 	if (!opt_nogpu)
-		opencl_api().api_detect();
+		opencl_api()->api_detect();
 	gpu_threads = 0;
 #endif
 

@@ -663,7 +663,7 @@ extern struct cgpu_info **devices;
 extern int total_pools;
 extern struct pool **pools;
 extern const char *algo_names[];
-extern enum sha256_algos opt_algo;
+extern int opt_algo;
 extern struct strategies strategies[];
 extern enum pool_strategy pool_strategy;
 extern int opt_rotate_period;

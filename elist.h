@@ -199,7 +199,7 @@ static inline void list_splice_init(struct list_head *list,
  */
 #ifndef _MSC_VER
 #define list_entry(ptr, type, member) \
-	(reinterpret_cast<type *>((char *)(ptr)-(char *)(&(reinterpret_cast<type *>(1)->member))+1))
+	((type)((char *)(ptr)-(unsigned long)(&((type)0)->member)))
 #else
 #define list_entry(ptr, ptrtype, member) \
 	(reinterpret_cast<ptrtype>((char *)(ptr)-(char *)(&(reinterpret_cast<ptrtype>(1)->member))+1))
@@ -240,10 +240,10 @@ static inline void list_splice_init(struct list_head *list,
  * @member:	the name of the list_struct within the struct.
  */
 #ifndef _MSC_VER
-#define list_for_each_entry(pos, head, member)				\
-	for (pos = list_entry((head)->next, typeof(*pos), member);	\
-	     &pos->member != (head); 					\
-	     pos = list_entry(pos->member.next, typeof(*pos), member))
+#define list_for_each_entry(pos, head, member) \
+	for (pos = list_entry((head)->next, typeof(pos), member); \
+				&pos->member != (head);                                         \
+				pos = list_entry(pos->member.next, typeof(pos), member))
 #else
 #define list_for_each_entry(pos, head, member)				\
 	for (pos = list_entry((head)->next, typeof(pos), member);	\
@@ -259,10 +259,10 @@ static inline void list_splice_init(struct list_head *list,
  */
 #ifndef _MSC_VER
 #define list_for_each_entry_safe(pos, n, head, member)			\
-	for (pos = list_entry((head)->next, typeof(*pos), member),	\
-		n = list_entry(pos->member.next, typeof(*pos), member);	\
+	for (pos = list_entry((head)->next, typeof(pos), member),	\
+		n = list_entry(pos->member.next, typeof(pos), member);	\
 	     &pos->member != (head); 					\
-	     pos = n, n = list_entry(n->member.next, typeof(*n), member))
+	     pos = n, n = list_entry(n->member.next, typeof(n), member))
 
 #else
 

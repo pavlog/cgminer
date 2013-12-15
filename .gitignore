@@ -45,3 +45,15 @@ mkinstalldirs
 /*.user
 /x64
 /*.log
+
+.DS_Store
+
+*.xcworkspacedata
+
+*.xccheckout
+
+*.xcbkptlist
+
+*.xcscheme
+
+*.plist

@@ -30,8 +30,7 @@ static void my_log_curses(__maybe_unused int prio, char *f, va_list ap)
 	else
 #endif
 	{
-		int len = strlen(f);
-
+		//int len = strlen(f);
 		//strcpy(f + len - 1, "                    \n");
 
 		mutex_lock(&console_lock);

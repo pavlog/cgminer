@@ -94,6 +94,7 @@ int parse_one(int *argc, char *argv[], unsigned *offset,
 		if (optarg)
 			return parse_err(errlog, argv[0], o, len,
 					 "doesn't allow an argument");
+		const char* name = opt_table[i].names;
 		problem = opt_table[i].cb(opt_table[i].u.arg);
 	} else {
 		if (!optarg) {

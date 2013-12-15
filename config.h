@@ -1,20 +1,6 @@
 #pragma once
 
-#if defined(_MSC_VER)
-
-#define WIN32_LEAN_AND_MEAN		// Exclude rarely-used stuff from Windows headers
-#include <windows.h>
-
-#define USE_SCRYPT
-#define HAVE_OPENCL
-#define WANT_X8664_SSE4
-
-#define HAVE_ADL
-
-//#define WANT_X8664_SSE2
-//#define WANT_X8632_SSE2
-//#define WANT_SSE2_4WAY
-//#define WANT_ALTIVEC_4WAY
+#define HAVE_STDINT_H
 
 #define PHATK_KERNNAME "phatk120724"
 #define POCLBM_KERNNAME "poclbm120724"
@@ -22,6 +8,28 @@
 #define DIABLO_KERNNAME "diablo120724"
 #define SCRYPT_KERNNAME "scrypt120724"
 
+#ifdef __APPLE_CC__
+
+#define USE_SCRYPT
+#define HAVE_OPENCL
+
+#endif
+
+#if defined(_MSC_VER)
+
+#define WIN32_LEAN_AND_MEAN		// Exclude rarely-used stuff from Windows headers
+#include <windows.h>
+
+#define WANT_X8664_SSE4
+
+#define USE_SCRYPT
+#define HAVE_OPENCL
+#define HAVE_ADL
+
+//#define WANT_X8664_SSE2
+//#define WANT_X8632_SSE2
+//#define WANT_SSE2_4WAY
+//#define WANT_ALTIVEC_4WAY
 
 #define PRIi64 "I64d"
 #define PRIi32 "I32d"
@@ -29,15 +37,6 @@
 #define PRIu64 "I64u"
 
 #define PATH_MAX MAX_PATH
-
-#define VERSION "v2.6.2"
-
-#define PACKAGE_NAME "cgminer"
-#define PACKAGE_TARNAME "cgminer"
-#define PACKAGE_VERSION "2.4.2"
-#define PACKAGE_STRING "cgminer 2.4.2"
-#define PACKAGE "cgminer"
-#define CGMINER_PREFIX ""
 
 #define R_OK 0
 
@@ -47,10 +46,6 @@
 #include <process.h>
 
 #define va_copy(a, b) memcpy(&(a), &(b), sizeof(va_list))
-
-#ifdef _WIN64
-//#define __x86_64__
-#endif
 
 //#define USE_AVX2 1
 
@@ -167,4 +162,13 @@ inline void* memmem (void* buf, size_t buflen, void* pat, size_t patlen)
 
 
 #endif
+
+#define VERSION "v2.6.2"
+
+#define PACKAGE_NAME "cgminer"
+#define PACKAGE_TARNAME "cgminer"
+#define PACKAGE_VERSION "2.4.2"
+#define PACKAGE_STRING "cgminer 2.4.2"
+#define PACKAGE "cgminer"
+#define CGMINER_PREFIX ""
 
