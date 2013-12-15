@@ -1,19 +1,28 @@
 
-This is a fork from https://github.com/ckolivas/cgminer to build cgminer in Microsoft Visual Studio 2010 (no mingw required).
+This is a fork from https://github.com/ckolivas/cgminer to build cgminer in Microsoft Visual Studio 2010 (no mingw required) and on Xcode.
 
-Details:
+Details common:
 
-1) scrypt enabled
-2) only opencl support
-3) command options added
+* scrypt enabled
+* only opencl support
+* command options added
 	* --nonce-bias "Nonce bias (default: 0)"
 	* --nonce-range "Nonce range (default: 4294967295)"
 	* --nonce-split "Nonce split across threads(default: 1)"
-	* --opencl-all "Enumerates all opencl devices (includeiong cpu) (default: 0)"
-4) only x64 platform and VS2010 (seems like VS2010+ can be supported withoput problems)
-5) ADL enabled
+	* --opencl-all "Enumerates all opencl devices (including cpu)"
 
-Step by step instruction:
+
+Microsoft Windows specific details:
+
+* only x64 platform and VS2010 (seems like VS2010+ can be supported withoput problems)
+* ADL enabled
+
+MacOS specific details:
+
+* nothing
+
+
+Microsoft Windows Step by step instruction:
 
 1) ADL support
 	Please insert AMD ADL files adl_defines.h adl_sdk.h adl_structures.h in to folder ADL_SDK.
@@ -22,8 +31,11 @@ Step by step instruction:
 2) YASM assembler for VS2010
 	Web site - http://yasm.tortall.net/ 
 	VS2010 x64 download link - http://www.tortall.net/projects/yasm/releases/vsyasm-1.2.0-win64.zip
-	VS2010 setup instraction - http://www.tortall.net/projects/yasm/manual/html/vsyasm.html also available in zip package
+	VS2010 setup instruction - http://www.tortall.net/projects/yasm/manual/html/vsyasm.html also available in zip package
 	
+
+MacOS Step by step instruction:
+* open cgminer project and compile
 
 
 GIT TREE: 
