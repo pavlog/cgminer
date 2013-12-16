@@ -393,7 +393,7 @@ static void sharelog(const char*disposition, const struct work*work)
 	struct timeval tv__;
 	tv__.tv_sec = t;
 	get_datestamp(blocktime, &tv__);
-	rv = snprintf(s, sizeof(s), "%s %lu,%lu,%lu,%s,%s,%s,%s%u,%u,%s,%s\n", blocktime, work->blk.nonce, swab32(((uint32_t*)work->data)[17]),t, disposition, target, pool->rpc_url, cgpu->api->name, cgpu->device_id, thr_id, hash, data);
+	rv = snprintf(s, sizeof(s), "%s %lu,%0X,%lu,%lu,%s,%s,%s,%s%u,%u,%s,%s\n", blocktime, work->blk.nonce, work->blk.nonce, swab32(((uint32_t*)work->data)[17]),t, disposition, target, pool->rpc_url, cgpu->api->name, cgpu->device_id, thr_id, hash, data);
 	//
 	free(target);
 	free(hash);
@@ -4266,12 +4266,28 @@ bool submit_nonce(struct thr_info *thr, struct work *work, uint32_t nonce)
 	return submit_work_sync(thr, work);
 }
 
-static inline bool abandon_work(struct work *work, struct timeval *wdiff, uint64_t hashes)
+static inline bool abandon_work(struct work *work, struct timeval *wdiff, uint64_t hashes,struct thr_info *mythr)
 {
+	const int thr_id = mythr->id;
+	uint64_t max_nonce = 0xffffffff;
+	if( opt_nonce_split )
+	{
+		max_nonce = opt_nonce_range / (opt_n_threads!=-1 ? opt_n_threads : mythr->cgpu->threads) * (thr_id + 1)+opt_nonce_bias;
+	}
+	else
+	{
+		max_nonce = opt_nonce_bias+opt_nonce_range;
+	
+	}
+
+	uint64_t cur_nonce = work->blk.nonce+hashes;
+
+
 	if (wdiff->tv_sec > opt_scantime ||
 	    work->blk.nonce >= MAXTHREADS - hashes ||
 	    hashes >= 0xfffffffe ||
-	    stale_work(work, false))
+	    stale_work(work, false) ||
+		cur_nonce >=max_nonce )
 		return true;
 	return false;
 }
@@ -4404,7 +4420,7 @@ void *miner_thread(void *userdata)
 			pool_stats->getwork_calls++;
 
 			thread_reportin(mythr);
-			applog(LOG_DEBUG, "[thread %d: %lu %lu %lu]", thr_id, work->blk.nonce,max_nonce,max_nonce-work->blk.nonce);
+			applog(LOG_DEBUG, "[thread %d: %lu %lu %lu %lu]", thr_id, work->blk.nonce,max_nonce,max_nonce-work->blk.nonce,swab32(((uint32_t*)work->data)[17]));
 			hashes = api->scanhash(mythr, work, work->blk.nonce + max_nonce);
 			thread_reportin(mythr);
 
@@ -4479,7 +4495,7 @@ void *miner_thread(void *userdata)
 				mt_disable(mythr, thr_id, api);
 
 			sdiff.tv_sec = sdiff.tv_usec = 0;
-		} while (!abandon_work(work, &wdiff, cgpu->max_hashes));
+		} while (!abandon_work(work, &wdiff, cgpu->max_hashes,mythr));
 	}
 
 out:
@@ -5320,7 +5336,7 @@ int main(int argc, char *argv[])
 	if (unlikely(curl_global_init(CURL_GLOBAL_ALL)))
 		quit(1, "Failed to curl_global_init");
 
-	initial_args = (char **)malloc(sizeof(char *) * (argc + 1));
+	initial_args = (const char **)malloc(sizeof(char *) * (argc + 1));
 	for  (i = 0; i < argc; i++)
 		initial_args[i] = strdup(argv[i]);
 	initial_args[argc] = NULL;
